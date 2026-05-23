@@ -12,29 +12,38 @@ import {
   BrainCircuit, Rocket, Trophy, ArrowRight, Dna
 } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { Canvas } from '@react-three/fiber';
+import { ThreeDGeometry } from '../components/ui/ThreeDGeometry';
 
-// Aceternity-style Spotlight Card with Hover Glow
+// Aceternity-style 3D Spotlight Card
 const BentoCard = ({ children, className }: { children: React.ReactNode, className?: string }) => {
   const divRef = useRef<HTMLDivElement>(null);
-  const [isFocused, setIsFocused] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [opacity, setOpacity] = useState(0);
+  
+  // 3D Tilt state
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!divRef.current || isFocused) return;
+    if (!divRef.current) return;
     const div = divRef.current;
     const rect = div.getBoundingClientRect();
-    setPosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  };
-
-  const handleFocus = () => {
-    setIsFocused(true);
-    setOpacity(1);
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-    setOpacity(0);
+    
+    // Spotlight position
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setPosition({ x, y });
+    
+    // 3D Tilt calculations
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const rotateXValue = ((y - centerY) / centerY) * -5; // Max 5 deg tilt
+    const rotateYValue = ((x - centerX) / centerX) * 5;
+    
+    setRotateX(rotateXValue);
+    setRotateY(rotateYValue);
   };
 
   const handleMouseEnter = () => {
@@ -43,31 +52,43 @@ const BentoCard = ({ children, className }: { children: React.ReactNode, classNa
 
   const handleMouseLeave = () => {
     setOpacity(0);
+    setRotateX(0);
+    setRotateY(0);
   };
 
   return (
-    <div
+    <motion.div
       ref={divRef}
       onMouseMove={handleMouseMove}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      animate={{
+        rotateX,
+        rotateY,
+        transformPerspective: 1000,
+      }}
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className={cn(
         "relative rounded-3xl border border-white/10 bg-slate-950 overflow-hidden",
         className
       )}
+      style={{ transformStyle: "preserve-3d" }}
     >
       <div
         className="pointer-events-none absolute -inset-px opacity-0 transition duration-300 z-10"
         style={{
           opacity,
-          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, rgba(99,102,241,0.15), transparent 40%)`,
+          background: `radial-gradient(800px circle at ${position.x}px ${position.y}px, rgba(99,102,241,0.15), transparent 40%)`,
         }}
       />
       <div className="absolute inset-[1px] bg-slate-950/80 rounded-[23px] z-0" />
-      <div className="relative z-20 h-full p-8">{children}</div>
-    </div>
+      <div 
+        className="relative z-20 h-full p-8"
+        style={{ transform: "translateZ(20px)" }} // Pop out content slightly
+      >
+        {children}
+      </div>
+    </motion.div>
   );
 };
 
@@ -116,8 +137,14 @@ export default function LandingPage() {
       <main className="relative z-10">
         
         {/* SECTION 1: Aceternity Hero */}
-        <section className="relative pt-40 pb-20 lg:pt-52 lg:pb-32 px-6 flex flex-col items-center justify-center min-h-screen">
-          <div className="max-w-5xl mx-auto text-center w-full relative">
+        <section className="relative pt-40 pb-20 lg:pt-52 lg:pb-32 px-6 flex flex-col items-center justify-center min-h-screen overflow-hidden">
+          <div className="absolute inset-0 z-0 pointer-events-none">
+             <Canvas camera={{ position: [0, 0, 10], fov: 50 }}>
+                <ambientLight intensity={0.5} />
+                <ThreeDGeometry />
+             </Canvas>
+          </div>
+          <div className="max-w-5xl mx-auto text-center w-full relative z-10">
             
             {/* Background glowing line */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent blur-sm"></div>
@@ -413,37 +440,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* SECTION 3: Aceternity CTA */}
-        <section className="py-40 relative overflow-hidden flex justify-center">
-          <div className="absolute inset-0 bg-indigo-500/5" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#030303_70%)]" />
-          
-          <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              whileInView={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", bounce: 0.4, duration: 0.8 }}
-              className="relative p-16 rounded-[48px] border border-white/10 bg-slate-950/50 backdrop-blur-3xl shadow-2xl overflow-hidden group"
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
-              
-              <Rocket className="w-16 h-16 text-indigo-400 mx-auto mb-10 group-hover:-translate-y-4 transition-transform duration-700 ease-out" />
-              <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight tracking-tight">
-                Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500">Career OS</span> starts here.
-              </h2>
-              <p className="text-slate-400 text-xl mb-12 max-w-xl mx-auto">
-                Stop practicing blindly. Start training with the most advanced AI preparation engine available.
-              </p>
-              
-              <button 
-                onClick={() => navigate('/auth')} 
-                className="relative group/btn rounded-full bg-indigo-500 px-12 py-5 text-sm font-black uppercase tracking-widest text-white transition-all hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(99,102,241,0.4)] hover:shadow-[0_0_60px_rgba(99,102,241,0.6)]"
-              >
-                <span className="relative z-10 flex items-center gap-2">Enter HireIQ Now <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" /></span>
-              </button>
-            </motion.div>
-          </div>
-        </section>
 
       </main>
 

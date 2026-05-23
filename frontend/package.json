@@ -12,6 +12,8 @@
     "@headlessui/react": "^1.7.16",
     "@heroicons/react": "^2.0.18",
     "@monaco-editor/react": "^4.7.0",
+    "@react-three/drei": "^9.105.6",
+    "@react-three/fiber": "^8.16.1",
     "@tanstack/react-query": "^5.100.11",
     "@types/react-helmet-async": "^1.0.1",
     "axios": "^1.7.3",
@@ -27,11 +29,13 @@
     "react-router-dom": "^6.16.0",
     "recharts": "^2.9.0",
     "socket.io-client": "^4.7.2",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
+    "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.41",
