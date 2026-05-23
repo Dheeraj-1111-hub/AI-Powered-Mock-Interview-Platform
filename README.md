@@ -163,7 +163,3 @@ npm run dev
 Navigate to `http://localhost:5174` in your browser.
 
 ---
-
-<div align="center">
-  <p>Crafted with ❤️ for ambitious engineers.</p>
-</div>
