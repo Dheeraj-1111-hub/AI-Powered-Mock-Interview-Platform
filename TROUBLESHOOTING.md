@@ -272,7 +272,7 @@ Error: Invalid API key for Groq
 1. **Verify API Key in .env**
 ```bash
 # Check backend/.env:
-GROQ_API_KEY=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
+GROQ_API_KEY=your_groq_api_key_here
 
 # Should NOT be empty or 'your-groq-api-key'
 ```

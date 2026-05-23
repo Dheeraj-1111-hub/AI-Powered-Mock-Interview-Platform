@@ -48,9 +48,9 @@ npm run dev
 
 Your `.env` file:
 ```env
-GROQ_API_KEY=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
+GROQ_API_KEY=your_groq_api_key_here
 JUDGE0_URL=http://localhost:2358
-MONGODB_URI=mongodb+srv://ysaidheeraj1111_db_user:REMOVED_PASSWORD@cluster0.qz2wbuy.mongodb.net/
+MONGODB_URI=your_mongodb_connection_string_here
 JWT_SECRET=super_secret_random_string
 CORS_ORIGIN=http://localhost:5174
 ```
