@@ -483,7 +483,7 @@ export default function CodingLabPage() {
             {review && (
                <button 
                   onClick={() => setActiveRightDrawer('audit')} 
-                  className="flex items-center gap-2.5 px-4 h-11 rounded-xl bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 border border-emerald-500/20 transition-all animate-bounce shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  className="flex items-center gap-2.5 px-4 h-11 rounded-xl bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 border border-emerald-500/20 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                >
                   <Brain className="w-4 h-4 text-emerald-400 animate-pulse" /> AI Audit
                </button>
