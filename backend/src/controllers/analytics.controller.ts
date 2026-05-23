@@ -85,16 +85,17 @@ export const getSummary = async (req: Request, res: Response) => {
     
     trends = Object.keys(trendMap).map(date => ({
       name: date,
-      score: Math.round(trendMap[date].totalScore / trendMap[date].count)
+      score: Math.round(trendMap[date].totalScore / trendMap[date].count),
+      originalDelta: 0
     })).reverse();
 
     if (trends.length === 0) {
-      trends = [{ name: 'Mon', score: 0 }, { name: 'Tue', score: 0 }, { name: 'Wed', score: 0 }];
+      trends = [{ name: 'Mon', score: 0, originalDelta: 0 }, { name: 'Tue', score: 0, originalDelta: 0 }, { name: 'Wed', score: 0, originalDelta: 0 }];
     } else if (trends.length === 1) {
       const singleDate = new Date(trends[0].name);
       singleDate.setDate(singleDate.getDate() - 1);
       const prevDateStr = singleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      trends.unshift({ name: prevDateStr, score: 0 }); // Baseline start
+      trends.unshift({ name: prevDateStr, score: 0, originalDelta: 0 }); // Baseline start
     }
   } else {
     // Compress events to distinct days for chart readability
@@ -104,7 +105,8 @@ export const getSummary = async (req: Request, res: Response) => {
     });
     trends = Object.keys(compressedMap).map(date => ({
         name: date,
-        score: compressedMap[date]
+        score: compressedMap[date],
+        originalDelta: 0
     }));
 
     // Recharts AreaChart requires at least 2 data points to render a line.
@@ -113,7 +115,7 @@ export const getSummary = async (req: Request, res: Response) => {
         const singleDate = new Date(trends[0].name);
         singleDate.setDate(singleDate.getDate() - 1);
         const prevDateStr = singleDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        trends.unshift({ name: prevDateStr, score: 0 }); // Baseline start
+        trends.unshift({ name: prevDateStr, score: 0, originalDelta: 0 }); // Baseline start
     }
   }
 

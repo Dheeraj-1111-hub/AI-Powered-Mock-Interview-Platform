@@ -201,13 +201,13 @@ if __name__ == '__main__':
       processInstance.stdout.on('data', (data) => { stdout += data.toString(); });
       processInstance.stderr.on('data', (data) => { stderr += data.toString(); });
 
-      processInstance.on('close', (code) => {
+      processInstance.on('close', (exitCode) => {
         const endTime = process.hrtime.bigint();
         const runtimeSec = Number(endTime - startTime) / 1000000000;
         
         try { fs.unlinkSync(filepath); } catch {}
 
-        if (code === 0) {
+        if (exitCode === 0) {
           let parsedResult = stdout.trim();
           let rawReturnValue = parsedResult;
           try {
@@ -229,7 +229,7 @@ if __name__ == '__main__':
             stdout: '',
             stderr: stderr.trim(),
             compile_output: stderr.trim(),
-            status: code === null ? 'Time Limit Exceeded' : 'Runtime Error',
+            status: exitCode === null ? 'Time Limit Exceeded' : 'Runtime Error',
             time: runtimeSec,
             memory: estimateMemory(code, 0)
           });

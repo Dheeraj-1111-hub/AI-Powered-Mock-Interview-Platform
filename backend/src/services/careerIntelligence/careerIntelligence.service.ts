@@ -16,7 +16,7 @@ import Roadmap from '../../models/Roadmap';
 import logger from '../logger';
 import { Types } from 'mongoose';
 import axios from 'axios';
-import { getTodayFocus } from './readinessEngine'; // We'll move or rewrite this
+
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000/api';
 

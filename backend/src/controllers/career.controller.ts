@@ -259,9 +259,9 @@ export const generateUserRoadmap = async (req: Request, res: Response) => {
       targetRole: profile?.targetRole || user.role,
       targetCompany: profile?.targetCompany || '',
       currentYear: profile?.currentYear || 'junior',
-      dsaComfort: profile?.dsaComfort || 5,
-      systemDesignComfort: profile?.systemDesignComfort || 3,
-      dailyHoursAvailable: profile?.dailyHoursAvailable || 2,
+      dsaComfort: (profile as any)?.dsaComfort || 5,
+      systemDesignComfort: (profile as any)?.systemDesignComfort || 3,
+      dailyHoursAvailable: (profile as any)?.dailyHoursAvailable || 2,
       weakTopics: intelligence.strugglingTopics.slice(0, 5),
       strongTopics: intelligence.strongTopics.slice(0, 3),
       persona: 'faang_engineer',
@@ -594,7 +594,7 @@ export const shiftStrategy = async (req: Request, res: Response) => {
     if (activeIdx !== -1 && user.careerStrategies) {
       user.careerStrategies[activeIdx].state = 'archived';
       user.careerStrategies[activeIdx].archivedAt = new Date();
-      user.careerStrategies[activeIdx].peakReadiness = user.interviewReadinessScore || 0;
+      (user.careerStrategies[activeIdx] as any).peakReadiness = user.interviewReadinessScore || 0;
     }
 
     // Add new strategy
