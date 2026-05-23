@@ -1,0 +1,38 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      
+      - name: Install Frontend Dependencies
+        run: cd frontend && npm install
+      
+      - name: Build Frontend
+        run: cd frontend && npm run build
+        
+      - name: Install Backend Dependencies
+        run: cd backend && npm install
+        
+      - name: Build Backend
+        run: cd backend && npm run build
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Production
+        run: echo "Deploying to cloud infrastructure..."
+        # Add real deployment steps here (e.g., Railway/Vercel CLI)
