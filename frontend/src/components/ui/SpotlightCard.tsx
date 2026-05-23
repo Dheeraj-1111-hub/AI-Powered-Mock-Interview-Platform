@@ -6,12 +6,14 @@ interface SpotlightCardProps {
   children: ReactNode;
   className?: string;
   spotlightColor?: string;
+  onClick?: () => void;
 }
 
 export function SpotlightCard({ 
   children, 
   className,
-  spotlightColor = 'rgba(99, 102, 241, 0.15)' // Indigo glow by default
+  spotlightColor = 'rgba(99, 102, 241, 0.15)', // Indigo glow by default
+  onClick
 }: SpotlightCardProps) {
   const divRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -53,6 +55,7 @@ export function SpotlightCard({
       onBlur={handleBlur}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
       className={cn(
         'group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/50 p-8 transition-colors hover:border-white/20',
         className
