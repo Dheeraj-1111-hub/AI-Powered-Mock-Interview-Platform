@@ -9,7 +9,7 @@ export const validate = (schema: ZodTypeAny) => (req: Request, res: Response, ne
     if (error instanceof ZodError) {
       return res.status(400).json({
         message: 'Validation failed',
-        errors: error.errors.map((e: any) => ({ path: e.path[0], message: e.message }))
+        errors: (error as any).errors.map((e: any) => ({ path: e.path[0], message: e.message }))
       });
     }
     next(error);
