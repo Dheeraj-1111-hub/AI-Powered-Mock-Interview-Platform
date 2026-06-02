@@ -122,7 +122,7 @@ const userSchema = new Schema<IUser>({
   skills: { type: [String], default: [] },
   experience: { type: String, default: 'entry' },
   createdAt: { type: Date, default: Date.now },
-  isEmailVerified: { type: Boolean, default: false },
+  isEmailVerified: { type: Boolean, default: true },
   verificationToken: String,
   verificationTokenExpires: Date,
   resetPasswordToken: String,

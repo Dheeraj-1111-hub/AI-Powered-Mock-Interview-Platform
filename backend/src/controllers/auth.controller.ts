@@ -28,19 +28,9 @@ export const register = async (req: Request, res: Response) => {
   const verificationToken = generateToken();
   const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  const user = await User.create({ name, email, password: hashed, verificationToken, verificationTokenExpires });
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-  const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
+  const user = await User.create({ name, email, password: hashed, isEmailVerified: true });
   
-  sendEmail(
-    user.email,
-    'Verify your HireIQ AI Account',
-    `<p>Welcome to HireIQ AI!</p><p>Please verify your email by clicking the link below:</p><a href="${verificationLink}">${verificationLink}</a>`
-  ).catch(error => {
-    console.error('Failed to send verification email, but user was created.', error);
-  });
-
-  res.json({ message: 'Registration successful. Please check your email to verify your account.' });
+  res.json({ message: 'Registration successful. Please log in.' });
 };
 
 export const verifyEmail = async (req: Request, res: Response) => {
@@ -62,7 +52,6 @@ export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
   if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-  if (!user.isEmailVerified) return res.status(403).json({ message: 'Please verify your email before logging in', code: 'UNVERIFIED' });
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
@@ -97,23 +86,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
   const user = await User.findOne({ email });
   if (!user) return res.json({ message: 'If that email exists, a reset link has been sent.' });
 
-  const resetToken = generateToken();
-  user.resetPasswordToken = resetToken;
-  user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
-  await user.save();
-
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-  const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-  
-  sendEmail(
-    user.email,
-    'Reset your HireIQ AI Password',
-    `<p>You requested a password reset for your HireIQ AI account.</p><p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a><p>If you did not request this, please ignore this email.</p>`
-  ).catch(error => {
-    console.error('Failed to send password reset email.', error);
-  });
-
-  res.json({ message: 'If that email exists, a reset link has been sent.' });
+  // Portfolio Environment: Disable password resets to prevent email dependency
+  res.json({ message: 'Password recovery is disabled in this demo environment. Please create a new account.' });
 };
 
 export const resetPassword = async (req: Request, res: Response) => {
