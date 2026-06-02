@@ -9,6 +9,8 @@ const createTransporter = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Force IPv4 to fix Render's ENETUNREACH IPv6 routing issue
+    family: 4
   });
 };
 
