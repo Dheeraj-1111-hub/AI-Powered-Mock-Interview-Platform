@@ -11,7 +11,7 @@ const createTransporter = () => {
     },
     // Force IPv4 to fix Render's ENETUNREACH IPv6 routing issue
     family: 4
-  });
+  } as any);
 };
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
