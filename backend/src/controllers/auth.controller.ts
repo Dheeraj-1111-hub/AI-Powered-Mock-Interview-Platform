@@ -32,11 +32,15 @@ export const register = async (req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
   const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
   
-  await sendEmail(
-    user.email,
-    'Verify your HireIQ AI Account',
-    `<p>Welcome to HireIQ AI!</p><p>Please verify your email by clicking the link below:</p><a href="${verificationLink}">${verificationLink}</a>`
-  );
+  try {
+    await sendEmail(
+      user.email,
+      'Verify your HireIQ AI Account',
+      `<p>Welcome to HireIQ AI!</p><p>Please verify your email by clicking the link below:</p><a href="${verificationLink}">${verificationLink}</a>`
+    );
+  } catch (error) {
+    console.error('Failed to send verification email, but user was created.', error);
+  }
 
   res.json({ message: 'Registration successful. Please check your email to verify your account.' });
 };
@@ -103,11 +107,15 @@ export const forgotPassword = async (req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
   const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
   
-  await sendEmail(
-    user.email,
-    'Reset your HireIQ AI Password',
-    `<p>You requested a password reset for your HireIQ AI account.</p><p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a><p>If you did not request this, please ignore this email.</p>`
-  );
+  try {
+    await sendEmail(
+      user.email,
+      'Reset your HireIQ AI Password',
+      `<p>You requested a password reset for your HireIQ AI account.</p><p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a><p>If you did not request this, please ignore this email.</p>`
+    );
+  } catch (error) {
+    console.error('Failed to send password reset email.', error);
+  }
 
   res.json({ message: 'If that email exists, a reset link has been sent.' });
 };

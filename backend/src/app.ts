@@ -20,6 +20,7 @@ import logger from './services/logger';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust the reverse proxy (e.g., Render)
 
 // PHASE 8: PRODUCTION HARDENING
 app.use(helmet({
