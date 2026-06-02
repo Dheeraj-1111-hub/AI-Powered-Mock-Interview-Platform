@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../services/auth.service';
 import { loginUser, registerUser } from '../services/api.service';
 import { GlowingButton } from '../components/ui/GlowingButton';
-import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2, Terminal, Globe } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 const getPasswordStrength = (password: string) => {
@@ -27,7 +27,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<string | null>(null);
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -72,13 +72,6 @@ export default function AuthPage() {
     }
   };
 
-  const handleSocialLogin = (platform: string) => {
-    setSocialLoading(platform);
-    setTimeout(() => {
-      setSocialLoading(null);
-      setError(`The ${platform} integration is currently in Sandbox mode.`);
-    }, 1500);
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#030303] px-4 sm:px-6 relative overflow-hidden font-sans">
@@ -112,29 +105,6 @@ export default function AuthPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
-             <button 
-               onClick={() => handleSocialLogin('Google')}
-               disabled={!!socialLoading}
-               className="flex items-center justify-center gap-3 h-12 rounded-2xl bg-white/[0.03] border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/[0.06] transition-all disabled:opacity-50"
-             >
-                {socialLoading === 'Google' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4 text-rose-500" />}
-                Google
-             </button>
-             <button 
-               onClick={() => handleSocialLogin('Github')}
-               disabled={!!socialLoading}
-               className="flex items-center justify-center gap-3 h-12 rounded-2xl bg-white/[0.03] border border-white/10 text-[10px] font-black uppercase tracking-widest hover:bg-white/[0.06] transition-all disabled:opacity-50"
-             >
-                {socialLoading === 'Github' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4 text-white" />}
-                Github
-             </button>
-          </div>
-
-          <div className="relative mb-8">
-             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-             <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest"><span className="bg-[#030303] px-4 text-slate-600">Secure Protocol</span></div>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <AnimatePresence mode="popLayout">

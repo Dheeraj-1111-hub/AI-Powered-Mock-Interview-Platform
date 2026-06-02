@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/User';
 import { reqUser } from '../middleware/auth';
+import { sendEmail } from '../services/email.service';
 
 const generateToken = () => crypto.randomBytes(32).toString('hex');
 
@@ -29,7 +30,13 @@ export const register = async (req: Request, res: Response) => {
 
   const user = await User.create({ name, email, password: hashed, verificationToken, verificationTokenExpires });
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-  console.log(`\n=== EMAIL DELIVERY MOCK ===\nTo: ${user.email}\nLink: ${frontendUrl}/verify-email?token=${verificationToken}\n===========================\n`);
+  const verificationLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
+  
+  await sendEmail(
+    user.email,
+    'Verify your HireIQ AI Account',
+    `<p>Welcome to HireIQ AI!</p><p>Please verify your email by clicking the link below:</p><a href="${verificationLink}">${verificationLink}</a>`
+  );
 
   res.json({ message: 'Registration successful. Please check your email to verify your account.' });
 };
@@ -94,7 +101,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
   await user.save();
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
-  console.log(`\n=== EMAIL DELIVERY MOCK ===\nTo: ${user.email}\nLink: ${frontendUrl}/reset-password?token=${resetToken}\n===========================\n`);
+  const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+  
+  await sendEmail(
+    user.email,
+    'Reset your HireIQ AI Password',
+    `<p>You requested a password reset for your HireIQ AI account.</p><p>Click the link below to reset your password:</p><a href="${resetLink}">${resetLink}</a><p>If you did not request this, please ignore this email.</p>`
+  );
+
   res.json({ message: 'If that email exists, a reset link has been sent.' });
 };
 
