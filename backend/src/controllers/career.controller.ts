@@ -171,11 +171,11 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
       }] as any;
       await user.save();
       // Have to fetch again to get the inserted _id
-      user.activeStrategyId = user.careerStrategies[0]._id.toString();
+      user.activeStrategyId = user.careerStrategies[0]?._id?.toString() || '';
       await user.save();
     }
 
-    const activeStrategy = user.careerStrategies?.find(s => s._id.toString() === user.activeStrategyId) 
+    const activeStrategy = user.careerStrategies?.find(s => s._id?.toString() === user.activeStrategyId) 
                         || user.careerStrategies?.[0];
 
     // Compute or use cached readiness (cache for 1 hour)
@@ -186,15 +186,20 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
     if (shouldRecompute) {
       intelligence = await computeCareerIntelligence(userId);
       // Cache to DB
-      await User.findByIdAndUpdate(userId, {
+      const updatePayload: any = {
         interviewReadinessScore: intelligence.readiness.overall,
         careerState: intelligence.careerState,
         readinessLastComputed: new Date(),
         behavioralTelemetry: intelligence.behavioralTelemetry,
         archetype: intelligence.archetype,
         growthVelocity: intelligence.growthVelocity,
-        $push: { trophies: { $each: intelligence.newTrophies } }
-      });
+      };
+
+      if (intelligence.newTrophies && intelligence.newTrophies.length > 0) {
+        updatePayload.$push = { trophies: { $each: intelligence.newTrophies } };
+      }
+
+      await User.findByIdAndUpdate(userId, updatePayload);
       
       if (intelligence.newTrophies.length > 0) {
         for (const trophy of intelligence.newTrophies) {
