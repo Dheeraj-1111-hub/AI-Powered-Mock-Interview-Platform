@@ -140,12 +140,15 @@ export const getSummary = async (req: Request, res: Response) => {
     }
 
     // 7. Persistent Memory (AI Conclusions backed by evidence)
-    const persistentMemory = {
-       strengths: skillDNA.filter(s => s.score > 70).slice(0, 2),
-       weaknesses: skillDNA.filter(s => s.score < 50).slice(0, 2),
-       observation: `User scored below 50 in ${interviews.filter(i => (i.overallScore||0) < 50).length} of last ${Math.min(5, interviews.length)} interviews.`,
-       evidence: interviews.slice(0, 4).map(i => `Interview #${i._id.toString().slice(-4)} = ${i.overallScore}`)
-    };
+    let persistentMemory = null;
+    if (interviews.length > 0 || totalCodingAttempts > 0 || intel.reasoning.length > 0) {
+       persistentMemory = {
+          strengths: skillDNA.filter(s => s.score > 70).slice(0, 2),
+          weaknesses: skillDNA.filter(s => s.score < 50).slice(0, 2),
+          observation: intel.reasoning.join(' '),
+          evidence: interviews.slice(0, 4).map(i => `Interview #${i._id.toString().slice(-4)} = ${i.overallScore}`)
+       };
+    }
 
     // Build Forensic Payload
     res.json({
