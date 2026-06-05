@@ -4,16 +4,45 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../services/auth.service';
 import { completeOnboarding } from '../services/api.service';
 import { GlowingButton } from '../components/ui/GlowingButton';
-import { Briefcase, Code2, GraduationCap, CheckCircle2, ChevronRight, Loader2, Target, Zap, Rocket, Search, X } from 'lucide-react';
+import { Briefcase, Code2, GraduationCap, CheckCircle2, ChevronRight, Loader2, Target, Zap, Rocket, Search, X, BrainCircuit, Cloud, Users, Shield, Cpu, Database } from 'lucide-react';
 import { cn } from '../utils/cn';
 
-const ROLES = [
-  'Frontend Engineer', 'Backend Engineer', 'Full Stack Engineer', 'Mobile Engineer',
-  'DevOps Engineer', 'Cloud Engineer', 'Platform Engineer', 'Data Engineer',
-  'Data Scientist', 'ML Engineer', 'AI Engineer', 'Generative AI Engineer',
-  'MLOps Engineer', 'Security Engineer', 'QA Engineer', 'Product Manager',
-  'Engineering Manager', 'System Design Specialist'
+const ROLE_CATEGORIES = [
+  {
+    name: 'Software Engineering',
+    icon: Code2,
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    roles: ['Frontend Engineer', 'Backend Engineer', 'Full Stack Engineer', 'Mobile Engineer', 'System Design Specialist']
+  },
+  {
+    name: 'Data & AI',
+    icon: BrainCircuit,
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-500/10',
+    border: 'border-indigo-500/20',
+    roles: ['Data Scientist', 'AI Engineer', 'ML Engineer', 'Generative AI Engineer', 'Data Engineer', 'MLOps Engineer']
+  },
+  {
+    name: 'Cloud & Platform',
+    icon: Cloud,
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/20',
+    roles: ['DevOps Engineer', 'Cloud Engineer', 'Platform Engineer', 'Security Engineer']
+  },
+  {
+    name: 'Product & Leadership',
+    icon: Users,
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/20',
+    roles: ['Engineering Manager', 'Product Manager', 'QA Engineer']
+  }
 ];
+
+const ROLES = ROLE_CATEGORIES.flatMap(c => c.roles);
 
 const EXPERIENCES = [
   'Student', 'Intern', 'New Grad', 'Junior', 'Mid-Level', 'Senior', 
@@ -136,28 +165,41 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 min-h-0 h-[300px]">
-                    {filteredRoles.length > 0 ? filteredRoles.map(r => (
-                      <button
-                        key={r}
-                        onClick={() => { setRole(r); setRoleSearch(''); }}
-                        className={cn(
-                          "w-full flex items-center justify-between p-5 rounded-2xl border transition-all group",
-                          role === r 
-                            ? "bg-indigo-500/10 border-indigo-500 text-white shadow-[0_0_20px_rgba(99,102,241,0.1)]" 
-                            : "bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05] hover:border-white/20"
-                        )}
-                      >
-                        <div className="flex items-center">
-                           <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-colors", role === r ? "bg-indigo-500 text-white" : "bg-white/5 text-slate-600")}>
-                              <Briefcase className="w-5 h-5" />
-                           </div>
-                           <span className="font-bold uppercase tracking-widest text-xs">{r}</span>
+                  <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-8 min-h-0 h-[400px] pb-8">
+                    {ROLE_CATEGORIES.filter(c => c.roles.some(r => r.toLowerCase().includes(roleSearch.toLowerCase()))).length > 0 ? (
+                      ROLE_CATEGORIES.filter(c => c.roles.some(r => r.toLowerCase().includes(roleSearch.toLowerCase()))).map((category, idx) => (
+                        <div key={idx} className="space-y-3">
+                          <div className="flex items-center gap-2 mb-4 px-1">
+                            <category.icon className={cn("w-4 h-4", category.color)} />
+                            <h3 className="text-xs font-black text-white uppercase tracking-widest">{category.name}</h3>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {category.roles.filter(r => r.toLowerCase().includes(roleSearch.toLowerCase())).map(r => (
+                              <button
+                                key={r}
+                                onClick={() => { setRole(r); setRoleSearch(''); }}
+                                className={cn(
+                                  "w-full flex items-center p-4 rounded-2xl border transition-all group text-left",
+                                  role === r 
+                                    ? cn(category.bg, category.border, "shadow-[0_0_20px_rgba(99,102,241,0.1)] text-white") 
+                                    : "bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05] hover:border-white/20"
+                                )}
+                              >
+                                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mr-3 shrink-0 transition-colors", role === r ? "bg-white/10 text-white" : "bg-white/5 text-slate-600")}>
+                                  <Briefcase className="w-4 h-4" />
+                                </div>
+                                <span className="font-bold uppercase tracking-widest text-[10px] leading-tight flex-1">{r}</span>
+                                {role === r && <Zap className={cn("w-4 h-4 animate-pulse ml-2 shrink-0", category.color)} />}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        {role === r && <Zap className="w-4 h-4 text-indigo-400 animate-pulse" />}
-                      </button>
-                    )) : (
-                      <div className="text-center py-8 text-slate-500">No roles found matching "{roleSearch}"</div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12 text-slate-500">
+                        <Search className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm font-medium uppercase tracking-widest">No roles found matching "{roleSearch}"</p>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -181,7 +223,7 @@ export default function OnboardingPage() {
                     <p className="text-slate-500 font-medium text-lg leading-relaxed">We adjust challenge heuristics based on your career timeline.</p>
                   </div>
                   <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar min-h-0 h-[400px]">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {EXPERIENCES.map(e => (
                         <button
                           key={e}
@@ -193,8 +235,8 @@ export default function OnboardingPage() {
                               : "bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05] hover:border-white/20"
                           )}
                         >
-                           <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mr-4 shrink-0 transition-colors", experience === e ? "bg-indigo-500 text-white" : "bg-white/5 text-slate-600")}>
-                              <GraduationCap className="w-5 h-5" />
+                           <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mr-3 shrink-0 transition-colors", experience === e ? "bg-white/10 text-white" : "bg-white/5 text-slate-600")}>
+                              <GraduationCap className="w-4 h-4" />
                            </div>
                            <span className="font-bold uppercase tracking-widest text-[10px] leading-tight flex-1">{e}</span>
                            {experience === e && <Zap className="w-4 h-4 text-indigo-400 animate-pulse ml-2 shrink-0" />}
