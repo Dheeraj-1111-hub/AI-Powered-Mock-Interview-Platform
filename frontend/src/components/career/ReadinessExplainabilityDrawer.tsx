@@ -5,8 +5,6 @@ import { cn } from '../../utils/cn';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  isOpen: boolean;
-  onClose: () => void;
   intelligence: any;
   careerBrain?: any;
 }

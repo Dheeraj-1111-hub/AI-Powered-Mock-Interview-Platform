@@ -417,7 +417,7 @@ export default function ResumePage() {
 
                      {/* DNA Matrix */}
                      <SpotlightCard className="p-6">
-                        <h3 className="text-sm font-black text-white mb-2 uppercase tracking-widest flex items-center gap-2"><Radar className="w-4 h-4 text-indigo-400" /> Skill DNA Matrix</h3>
+                        <h3 className="text-sm font-black text-white mb-2 uppercase tracking-widest flex items-center gap-2"><Target className="w-4 h-4 text-indigo-400" /> Skill DNA Matrix</h3>
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">NLP-driven Analysis</p>
                         <div className="h-48 w-full -ml-4">
                            <ResponsiveContainer width="100%" height="100%">

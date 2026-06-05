@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { 
   Pulse, Brain, Target, Fire, CaretRight, Code, CircleNotch, Sparkle,
-  TrendUp, CalendarBlank, Trophy, ArrowUpRight, Plus, ChartLineUp, TerminalWindow, Graph, Info
+  TrendUp, CalendarBlank, Trophy, ArrowUpRight, Plus, ChartLineUp, TerminalWindow, Graph, Info, Database
 } from '@phosphor-icons/react';
 
 import { AuthContext } from '../services/auth.service';
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                 trend={data?.intelligenceIndex?.score ? "+Active" : "New"}
                 icon={Brain} 
                 color="indigo"
-                evidence={data?.intelligenceIndex?.evidence}
+                evidence={(data?.intelligenceIndex as any)?.evidence}
              />
              <MetricCard 
                 label="Active Streak" 
@@ -161,7 +161,7 @@ export default function DashboardPage() {
                 trend={data?.telemetry?.mastery?.level || "Beginner"}
                 icon={TerminalWindow} 
                 color="fuchsia"
-                evidence={data?.telemetry?.mastery?.evidence}
+                evidence={(data?.telemetry?.mastery as any)?.evidence}
              />
           </div>
 
