@@ -3,6 +3,8 @@ import Interview from '../models/Interview';
 import ActivityLog from '../models/ActivityLog';
 import { reqUser } from '../middleware/auth';
 import axios from 'axios';
+import User from '../models/User';
+import ResumeAnalysis from '../models/ResumeAnalysis';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000/api';
 
@@ -27,9 +29,9 @@ export const startInterview = async (req: Request, res: Response) => {
       companyType, 
       persona,
       resumeContext: {
-          strengths: [...(latestResume?.strengths || []), ...(memory?.topStrengths || [])],
-          weaknesses: [...(latestResume?.weaknesses || []), ...(memory?.topWeaknesses || [])],
-          keywordGaps: [...(latestResume?.keywordGaps || []), ...(memory?.codingIssues || [])]
+          strengths: [...(latestResume?.strategicStrengths || []), ...(memory?.topStrengths || [])],
+          weaknesses: [...(latestResume?.criticalGaps?.map((g: any) => g.topic) || []), ...(memory?.topWeaknesses || [])],
+          keywordGaps: [...(latestResume?.keywordIntelligence?.missing || []), ...(memory?.codingIssues || [])]
       }
     });
 
@@ -275,7 +277,7 @@ export const endInterview = async (req: Request, res: Response) => {
     try {
         const user = await User.findById(interview.user);
         if (user) {
-            user.readinessLastComputed = null;
+            user.readinessLastComputed = undefined;
             await user.save();
         }
     } catch (e) {

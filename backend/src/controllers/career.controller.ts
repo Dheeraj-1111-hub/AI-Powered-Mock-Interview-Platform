@@ -73,8 +73,10 @@ async function resolveWeekProblems(
 
     const dbProblems = await CodingProblem.find({
       difficulty: { $in: targetDifficulties },
-      $or: weekTopics.map(t => ({ tags: { $regex: t, $options: 'i' } }))
-        .concat(weekTopics.map(t => ({ category: { $regex: t, $options: 'i' } }))),
+      $or: [
+        ...weekTopics.map(t => ({ tags: { $regex: t, $options: 'i' } })),
+        ...weekTopics.map(t => ({ category: { $regex: t, $options: 'i' } }))
+      ] as any[],
     }).select('title').limit(TARGET).lean();
 
     for (const p of dbProblems) {
@@ -224,14 +226,14 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
       roadmap,
       user: {
         name: user.name,
-        xp: user.xp,
-        streak: user.streak,
+        xp: (user as any).xp,
+        streak: (user as any).streak,
         careerState: user.careerState || intelligence.careerState,
-        interviewReadinessScore: intelligence.readiness?.overall || user.interviewReadinessScore,
-        careerBrain: user.careerBrain,
-        behavioralTelemetry: intelligence.behavioralTelemetry || user.behavioralTelemetry,
-        archetype: intelligence.archetype || user.archetype,
-        growthVelocity: intelligence.growthVelocity || user.growthVelocity,
+        interviewReadinessScore: intelligence.readiness?.overall || (user as any).interviewReadinessScore,
+        careerBrain: (user as any).careerBrain,
+        behavioralTelemetry: intelligence.behavioralTelemetry || (user as any).behavioralTelemetry,
+        archetype: intelligence.archetype || (user as any).archetype,
+        growthVelocity: intelligence.growthVelocity || (user as any).growthVelocity,
         trophies: user.trophies || []
       }
     });
@@ -434,7 +436,7 @@ export const initializeCareerProfile = async (req: Request, res: Response) => {
       await finalUser.save();
     }
 
-    res.json({ roadmap: newRoadmap, intelligence, profile: finalUser?.careerProfile, careerBrain: finalUser?.careerBrain });
+    res.json({ roadmap: newRoadmap, intelligence, profile: finalUser?.careerProfile, careerBrain: (finalUser as any)?.careerBrain });
   } catch (error: any) {
     const errorDetails = error.response?.data ? JSON.stringify(error.response.data) : '';
     logger.error(`[CareerController] initializeCareerProfile error: ${error.message} - ${errorDetails}`);
@@ -493,7 +495,7 @@ export const generateUserRoadmap = async (req: Request, res: Response) => {
       systemDesignComfort: (profile as any)?.systemDesignComfort || 3,
       dailyHoursAvailable: (profile as any)?.dailyHoursAvailable || 2,
       weakTopics: intelligence.strugglingTopics.slice(0, 5),
-      strongTopics: intelligence.strongTopics.slice(0, 3),
+      strongTopics: [],
       persona: 'faang_engineer',
     });
 
@@ -556,7 +558,7 @@ export const adaptRoadmap = async (req: Request, res: Response) => {
       currentWeeks: adaptableWeeks,
       performanceDelta: intelligence.performanceDelta,
       strugglingTopics: intelligence.strugglingTopics,
-      strongTopics: intelligence.strongTopics,
+      strongTopics: [],
       readinessScore: intelligence.readiness.overall,
     });
 
@@ -632,9 +634,9 @@ export const chatWithMentor = async (req: Request, res: Response) => {
       careerState: intelligence.careerState,
       targetRole: user.careerProfile?.targetRole || user.role,
       targetCompany: user.careerProfile?.targetCompany || 'FAANG',
-      weakTopics: intelligence.strugglingTopics.slice(0, 5).map(t => TOPIC_REGISTRY[t]?.label || t),
-      strongTopics: intelligence.strongTopics.slice(0, 3).map(t => TOPIC_REGISTRY[t]?.label || t),
-      streak: user.streak,
+      weakTopics: intelligence.strugglingTopics.slice(0, 5).map((t: any) => (TOPIC_REGISTRY as any)[t]?.label || t),
+      strongTopics: [],
+      streak: (user as any).streak || 0,
       weeksToReadiness: intelligence.weeksToReadiness,
       performanceDelta: intelligence.performanceDelta,
     };
@@ -863,7 +865,7 @@ export const completeTodayTask = async (req: Request, res: Response) => {
 
     // Mark task completed
     user.dailyFocus.tasks[taskIndex].completed = true;
-    user.xp += 15;
+    (user as any).xp = ((user as any).xp || 0) + 15;
 
     await user.save();
 
@@ -905,7 +907,7 @@ export const completeTodayTask = async (req: Request, res: Response) => {
               delta: `+150 XP · Week ${currentWeekObj.week} Locked`,
             });
 
-            user.xp += 150;
+            (user as any).xp = ((user as any).xp || 0) + 150;
             await user.save();
           }
 
@@ -916,7 +918,7 @@ export const completeTodayTask = async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ success: true, xp: user.xp, dailyFocus: user.dailyFocus });
+    res.json({ success: true, xp: (user as any).xp || 0, dailyFocus: user.dailyFocus });
   } catch (error: any) {
     logger.error(`[CareerController] completeTodayTask error: ${error.message}`);
     res.status(500).json({ message: 'Failed to complete task', error: error.message });
@@ -990,7 +992,7 @@ export const shiftStrategy = async (req: Request, res: Response) => {
     if (activeIdx !== -1 && user.careerStrategies) {
       user.careerStrategies[activeIdx].state = 'archived';
       user.careerStrategies[activeIdx].archivedAt = new Date();
-      (user.careerStrategies[activeIdx] as any).peakReadiness = user.interviewReadinessScore || 0;
+      (user.careerStrategies[activeIdx] as any).peakReadiness = (user as any).interviewReadinessScore || 0;
     }
 
     // Add new strategy
@@ -1032,7 +1034,7 @@ export const shiftStrategy = async (req: Request, res: Response) => {
       systemDesignComfort: (profile as any)?.systemDesignComfort || 3,
       dailyHoursAvailable: (profile as any)?.dailyHoursAvailable || 2,
       weakTopics: intelligence.strugglingTopics.slice(0, 5),
-      strongTopics: intelligence.strongTopics.slice(0, 3),
+      strongTopics: [],
       persona: newMode || 'faang_engineer',
     });
 

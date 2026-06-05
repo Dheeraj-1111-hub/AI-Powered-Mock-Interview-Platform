@@ -282,7 +282,7 @@ export const computeCareerIntelligence = async (
         ? `Averaged from ${auditScores.length} AI code reviews.`
         : `No AI code reviews completed yet.`,
       resumeStrength: latestResume 
-        ? `Based on latest ATS scan (${latestResume.atsScore || 0}%).` 
+        ? `Based on latest ATS scan (${latestResume.globalAts?.total || 0}%).` 
         : `No resume analysis available.`
     }
   };

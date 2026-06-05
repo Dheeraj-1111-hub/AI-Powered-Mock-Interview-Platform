@@ -56,7 +56,7 @@ export const calculateCareerPressureIndex = async (userId: string) => {
   const activeStrategy = user.careerStrategies?.find(s => s._id?.toString() === user.activeStrategyId) 
                       || user.careerStrategies?.[0];
   const isFAANG = activeStrategy?.mode === 'faang_sprint';
-  if (isFAANG && user.interviewReadinessScore < 50) {
+  if (isFAANG && (user as any).interviewReadinessScore < 50) {
     pressureScore += 30;
     reasons.push('Readiness behind FAANG schedule.');
   }

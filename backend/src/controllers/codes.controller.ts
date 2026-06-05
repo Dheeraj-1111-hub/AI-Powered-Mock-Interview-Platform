@@ -373,27 +373,11 @@ export const finishInterview = async (req: Request, res: Response) => {
     };
     await session.save();
 
-    // Career OS Integration: Update User metrics
+    // Career OS Integration: Cache invalidation
     const user = await User.findById(session.user);
-    if (user && session.feedbackScorecard) {
-      user.interviewReadinessScore = session.feedbackScorecard.overallReadiness;
-      user.communicationScore = session.feedbackScorecard.communication;
-      
-      // Update Skill Graph based on strong/weak areas (simple delta integration)
-      if (!user.skillGraph) user.skillGraph = new Map<string, number>();
-      
-      session.feedbackScorecard.strongAreas.forEach((skill: string) => {
-        const current = user.skillGraph.get(skill) || 50;
-        user.skillGraph.set(skill, Math.min(100, current + 5));
-      });
-      
-      session.feedbackScorecard.weakAreas.forEach((skill: string) => {
-        const current = user.skillGraph.get(skill) || 50;
-        user.skillGraph.set(skill, Math.max(0, current - 5));
-      });
-
+    if (user) {
       // Phase 4: Cross-Feature Validation (Cache invalidation)
-      user.readinessLastComputed = null;
+      user.readinessLastComputed = undefined;
       await user.save();
     }
 

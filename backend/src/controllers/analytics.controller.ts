@@ -22,7 +22,7 @@ export const getSummary = async (req: Request, res: Response) => {
     let practiceSessions = 0;
     interviews.forEach(i => {
        if (i.status === 'completed') completedInterviews++;
-       else if (i.status === 'abandoned') abandonedInterviews++;
+       else if ((i as any).status === 'abandoned') abandonedInterviews++;
        else practiceSessions++;
     });
 
@@ -49,7 +49,7 @@ export const getSummary = async (req: Request, res: Response) => {
         break;
       }
     }
-    longestStreak = Math.max(currentStreak, user.longestStreak || 0);
+    longestStreak = Math.max(currentStreak, (user as any).longestStreak || 0);
     const lastActive = uniqueDates.length > 0 ? uniqueDates[0] : 'Never';
     const expectedGain = Math.min(10, Math.max(1, 7 - currentStreak)); // simplistic prediction
 
@@ -63,7 +63,7 @@ export const getSummary = async (req: Request, res: Response) => {
        const topic = (c as any).topic || 'General';
        if (!topicStats[topic]) topicStats[topic] = { codingAttempts: 0, codingSolved: 0, codingTimeMs: 0, interviewAsked: 0, interviewAccuracySum: 0 };
        topicStats[topic].codingAttempts++;
-       if (c.status === 'solved') topicStats[topic].codingSolved++;
+       if (c.status === 'Accepted' || (c as any).status === 'solved') topicStats[topic].codingSolved++;
        topicStats[topic].codingTimeMs += (c as any).executionTime || 1200000; // default 20m
     });
 
