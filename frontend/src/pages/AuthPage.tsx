@@ -75,32 +75,43 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#030303] px-4 sm:px-6 relative overflow-hidden font-sans">
-      {/* Cinematic Background */}
-      <div className="absolute inset-0 bg-grid-white/[0.02]" />
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-indigo-500/5 via-transparent to-purple-500/5 pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/[0.08] rounded-full blur-[120px] mix-blend-screen pointer-events-none animate-pulse" />
+      {/* Ultra-Minimal Premium Background */}
+      <div className="absolute inset-0 bg-[#000000] z-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.03),transparent_50%)] z-0 pointer-events-none" />
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="glass-panel rounded-[32px] p-8 sm:p-10 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-white/[0.01]">
+        <div className="relative rounded-2xl p-8 sm:p-12 border border-white/[0.08] shadow-[0_0_100px_rgba(0,0,0,1)] bg-[#050505]">
           <div className="text-center mb-8">
             <motion.div 
               initial={{ rotate: -10 }}
               animate={{ rotate: 0 }}
-              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-500/10 ring-1 ring-indigo-500/20 mb-8 shadow-[0_0_40px_rgba(99,102,241,0.2)]"
+              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-500/10 ring-1 ring-indigo-500/20 mb-8 shadow-[0_0_40px_rgba(99,102,241,0.2)] relative"
             >
-              <span className="font-black text-2xl text-indigo-400 tracking-tighter">IQ</span>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 drop-shadow-[0_0_12px_rgba(99,102,241,0.8)]">
+                <path d="M12.9868 2.0003L4.48682 12.0003H11.9868L10.9868 21.0003L20.4868 9.5003H12.9868L12.9868 2.0003Z" fill="url(#sparkGradientAuth)" stroke="url(#sparkStrokeAuth)" strokeWidth="1.5" strokeLinejoin="round"/>
+                <defs>
+                  <linearGradient id="sparkGradientAuth" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#ffffff" />
+                    <stop offset="1" stopColor="#a3a3a3" />
+                  </linearGradient>
+                  <linearGradient id="sparkStrokeAuth" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#ffffff" />
+                    <stop offset="1" stopColor="#525252" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </motion.div>
-            <h1 className="text-3xl font-black tracking-tight text-white uppercase tracking-tighter">
-              {mode === 'login' ? 'System Access' : 'Create Identity'}
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              {mode === 'login' ? 'Welcome back' : 'Create an account'}
             </h1>
-            <p className="mt-3 text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+            <p className="mt-2 text-sm text-slate-400">
               {mode === 'login' 
-                ? 'Authentication required for platform entry' 
+                ? 'Enter your credentials to continue' 
                 : 'Initialize your career acceleration sequence'}
             </p>
           </div>
@@ -139,55 +150,55 @@ export default function AuthPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-2"
                 >
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600" />
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Full Name</label>
+                  <div className="relative group/input">
                     <input
                       required
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full rounded-2xl border border-white/5 bg-white/[0.03] pl-12 pr-4 py-4 text-white placeholder-slate-600 outline-none transition-all focus:border-indigo-500 focus:bg-white/[0.06] font-bold text-sm shadow-inner"
-                      placeholder="ENTER FULL NAME"
+                      className="peer w-full rounded-xl border border-white/[0.06] bg-white/[0.02] pl-10 pr-4 py-3.5 text-white placeholder-slate-600 outline-none transition-colors focus:border-white/20 focus:bg-white/[0.04] text-sm"
+                      placeholder="Enter full name"
                     />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 peer-focus:text-white transition-colors pointer-events-none" />
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             <div className="space-y-2">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Work Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600" />
+              <label className="block text-sm font-medium text-slate-300 mb-1.5 ml-1">Work Email</label>
+              <div className="relative group/input">
                 <input
                   required
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full rounded-2xl border border-white/5 bg-white/[0.03] pl-12 pr-4 py-4 text-white placeholder-slate-600 outline-none transition-all focus:border-indigo-500 focus:bg-white/[0.06] font-bold text-sm shadow-inner"
+                  className="peer w-full rounded-xl border border-white/[0.06] bg-white/[0.02] pl-10 pr-4 py-3.5 text-white placeholder-slate-600 outline-none transition-colors focus:border-white/20 focus:bg-white/[0.04] text-sm"
                   placeholder="name@company.com"
                 />
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 peer-focus:text-white transition-colors pointer-events-none" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between ml-1">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Master Key</label>
+              <div className="flex items-center justify-between ml-1 mb-1.5">
+                <label className="block text-sm font-medium text-slate-300">Password</label>
                 {mode === 'login' && (
-                  <Link to="/forgot-password" style={{ pointerEvents: 'none', opacity: 0.5 }} className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 tracking-tighter">
-                    Recover Access
+                  <Link to="/forgot-password" style={{ pointerEvents: 'none', opacity: 0.5 }} className="text-xs font-medium text-slate-400 hover:text-white transition-colors">
+                    Forgot password?
                   </Link>
                 )}
               </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-600" />
+              <div className="relative group/input">
                 <input
                   required
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full rounded-2xl border border-white/5 bg-white/[0.03] pl-12 pr-4 py-4 text-white placeholder-slate-600 outline-none transition-all focus:border-indigo-500 focus:bg-white/[0.06] font-bold text-sm shadow-inner"
+                  className="peer w-full rounded-xl border border-white/[0.06] bg-white/[0.02] pl-10 pr-4 py-3.5 text-white placeholder-slate-600 outline-none transition-colors focus:border-white/20 focus:bg-white/[0.04] text-sm"
                   placeholder="••••••••"
                 />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600 peer-focus:text-white transition-colors pointer-events-none" />
               </div>
               {mode === 'register' && form.password.length > 0 && (
                 <div className="mt-4 px-1">
@@ -220,17 +231,17 @@ export default function AuthPage() {
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <div className="flex items-center justify-center gap-3">
-                  <span className="font-black uppercase tracking-[0.2em]">{mode === 'login' ? 'Establish Link' : 'Initialize Account'}</span>
-                  <ArrowRight className="h-4 w-4" />
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-semibold">{mode === 'login' ? 'Continue' : 'Create account'}</span>
+                  <ArrowRight className="h-4 w-4 opacity-70" />
                 </div>
               )}
             </GlowingButton>
           </form>
 
           <div className="mt-10 text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              {mode === 'login' ? "New operative?" : "Existing operative?"}{' '}
+            <p className="text-sm text-slate-400">
+              {mode === 'login' ? "Don't have an account?" : "Already have an account?"}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -238,9 +249,9 @@ export default function AuthPage() {
                   setError('');
                   setSuccess('');
                 }}
-                className="text-indigo-400 hover:text-indigo-300 transition-colors ml-2"
+                className="text-white hover:underline transition-all ml-1 font-medium"
               >
-                {mode === 'login' ? 'Request Access' : 'Authenticate'}
+                {mode === 'login' ? 'Sign up' : 'Log in'}
               </button>
             </p>
           </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Crosshair, Briefcase, Zap, Clock, ShieldAlert, Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import api from '../../services/api.service';
+import { previewStrategyShift, shiftStrategy } from '../../services/api.service';
 
 interface Props {
   isOpen: boolean;
@@ -32,7 +32,7 @@ export default function StrategyCenterModal({ isOpen, onClose, activeStrategy, c
     setSelectedMode(mode);
     setLoadingPreview(true);
     try {
-      const res = await api.post('/career/strategy/preview', { newMode: mode });
+      const res = await previewStrategyShift({ newMode: mode });
       setPreview(res.data);
     } catch (error) {
       console.error(error);
@@ -43,7 +43,7 @@ export default function StrategyCenterModal({ isOpen, onClose, activeStrategy, c
   const handleSave = async () => {
     setLoadingSave(true);
     try {
-      await api.post('/career/strategy/shift', {
+      await shiftStrategy({
         targetCompany,
         targetRole,
         newMode: selectedMode,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -9,13 +10,16 @@ import {
 } from 'lucide-react';
 import { 
   fetchProblems, 
+  fetchProblemRecommendations,
   runCodeExecution, 
   submitCodeChallenge, 
   fetchMySubmissions,
   startCodingInterview,
   chatCodingInterview,
   finishCodingInterview,
-  fetchSubmissionAuditStatus
+  monitorCodingInterview,
+  fetchSubmissionAuditStatus,
+  addProblemDiscussion
 } from '../services/api.service';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { GlowingButton } from '../components/ui/GlowingButton';
@@ -25,7 +29,10 @@ import { useToast } from '../contexts/ToastContext';
 
 export default function CodingLabPage() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
+  const preselectedProblemId = searchParams.get('problem');
   const [problems, setProblems] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [selectedProblem, setSelectedProblem] = useState<any>(null);
   const [code, setCode] = useState('// Select a problem to begin...');
   const [language, setLanguage] = useState('javascript');
@@ -49,10 +56,20 @@ export default function CodingLabPage() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [interviewLimitSelected, setInterviewLimitSelected] = useState(2700);
 
+  // Telemetry States
+  const [openedAt, setOpenedAt] = useState<number>(Date.now());
+  const [firstKeystrokeAt, setFirstKeystrokeAt] = useState<number | null>(null);
+  const [compileAttempts, setCompileAttempts] = useState(0);
+  const [hintsRevealed, setHintsRevealed] = useState(0);
+  const [editorialViewed, setEditorialViewed] = useState(false);
+
   const [interviewSession, setInterviewSession] = useState<any>(null);
   const [chatMessage, setChatMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [selectedTone, setSelectedTone] = useState<'supportive' | 'interrogative' | 'silent' | 'demanding'>('interrogative');
+
+  const [newDiscussion, setNewDiscussion] = useState('');
+  const [postingDiscussion, setPostingDiscussion] = useState(false);
 
   useEffect(() => {
     let interval: any = null;
@@ -88,6 +105,32 @@ export default function CodingLabPage() {
       .catch((err) => console.error("Failed to load submissions:", err));
   }, [selectedProblem, output]);
 
+  // Proactive AI Monitor for Interview Mode
+  useEffect(() => {
+    let interval: any = null;
+    if (interviewMode && interviewSession) {
+      interval = setInterval(async () => {
+        try {
+          const res = await monitorCodingInterview({
+            sessionId: interviewSession._id,
+            currentCode: code,
+            language
+          });
+          if (res.data.interrupt && res.data.session) {
+            setInterviewSession(res.data.session);
+            setActiveRightDrawer('chat');
+            toast.toast('AI Interviewer Interruption', 'The interviewer has something to say.', 'info');
+          }
+        } catch (err) {
+          console.error("Failed to monitor interview:", err);
+        }
+      }, 30000); // 30 seconds
+    }
+    return () => clearInterval(interval);
+  }, [interviewMode, interviewSession, code, language]);
+
+
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -113,7 +156,11 @@ export default function CodingLabPage() {
   useEffect(() => {
     if (selectedProblem) {
        const saved = localStorage.getItem(`code_${selectedProblem._id}_${language}`);
-       if (saved) setCode(saved);
+       if (saved) {
+           setCode(saved);
+       } else {
+           setCode(selectedProblem.starterCode?.[language] || '');
+       }
     }
   }, [selectedProblem, language]);
 
@@ -130,15 +177,30 @@ export default function CodingLabPage() {
     const loadData = async () => {
       try {
         setLoadingProblems(true);
-        const [problemsRes, historyRes] = await Promise.all([
+        const [problemsRes, historyRes, recsRes] = await Promise.all([
           fetchProblems(),
-          fetchMySubmissions()
+          fetchMySubmissions(),
+          fetchProblemRecommendations().catch(() => ({ data: { recommendations: [] } }))
         ]);
         
         setProblems(problemsRes.data);
         setHistory(historyRes.data);
+        if (recsRes.data.success) {
+          setRecommendations(recsRes.data.recommendations);
+        }
         
-        if (problemsRes.data.length > 0) {
+        // Auto-select problem from ?problem=<id> URL param (from Today's Executive Focus)
+        if (preselectedProblemId) {
+          const targeted = problemsRes.data.find((p: any) => p._id === preselectedProblemId);
+          if (targeted) {
+            setSelectedProblem(targeted);
+            setCode(targeted.starterCode[language] || '');
+          } else if (problemsRes.data.length > 0) {
+            const first = problemsRes.data[0];
+            setSelectedProblem(first);
+            setCode(first.starterCode[language] || '');
+          }
+        } else if (problemsRes.data.length > 0) {
             const first = problemsRes.data[0];
             setSelectedProblem(first);
             setCode(first.starterCode[language] || '');
@@ -160,9 +222,17 @@ export default function CodingLabPage() {
     setOutput(null);
     setReview(null);
     setIsDrawerOpen(false);
+    
+    // Reset Telemetry
+    setOpenedAt(Date.now());
+    setFirstKeystrokeAt(null);
+    setCompileAttempts(0);
+    setHintsRevealed(0);
+    setEditorialViewed(false);
   };
 
   const handleRun = async () => {
+    setCompileAttempts(prev => prev + 1);
     setLoading(true);
     setActiveTab('output');
     setExecutionPhase('compiling');
@@ -185,13 +255,27 @@ export default function CodingLabPage() {
     setTimeout(() => setExecutionPhase('testing'), 800);
     setTimeout(() => setExecutionPhase('judging'), 1600);
     try {
-      const res = await submitCodeChallenge({ problemId: selectedProblem._id, code, language });
+      const timeToFirstCode = firstKeystrokeAt ? Math.round((firstKeystrokeAt - openedAt) / 1000) : 0;
+      const totalTime = Math.round((Date.now() - openedAt) / 1000);
+      const totalThinkingTime = totalTime - timeToFirstCode;
+
+      const telemetry = {
+        timeToFirstCode,
+        totalThinkingTime,
+        totalTime,
+        compileAttempts,
+        hintsUsed: hintsRevealed,
+        editorialViewed
+      };
+
+      const res = await submitCodeChallenge({ problemId: selectedProblem._id, code, language, telemetry });
       const subData = res.data;
       setOutput({
         status: subData.status,
         results: subData.results,
         time: subData.runtime || 0,
-        memory: subData.memory || 0
+        memory: subData.memory || 0,
+        telemetry: subData.telemetry
       });
 
       // Show AI Audit loading state
@@ -309,6 +393,25 @@ export default function CodingLabPage() {
     }
   };
 
+  const handlePostDiscussion = async () => {
+    if (!newDiscussion.trim() || !selectedProblem) return;
+    try {
+      setPostingDiscussion(true);
+      const res = await addProblemDiscussion(selectedProblem._id, newDiscussion);
+      setSelectedProblem({
+        ...selectedProblem,
+        discussions: res.data
+      });
+      setNewDiscussion('');
+      toast.toast('Discussion Posted', 'Your insight has been shared with the community.', 'success');
+    } catch (err) {
+      console.error("Failed to post discussion:", err);
+      toast.toast('Error', 'Failed to post discussion.', 'error');
+    } finally {
+      setPostingDiscussion(false);
+    }
+  };
+
   return (
     <div className="h-screen bg-[#050505] text-slate-100 flex flex-col overflow-hidden selection:bg-indigo-500/30 font-sans">
       <Navbar />
@@ -327,107 +430,176 @@ export default function CodingLabPage() {
                />
                {/* Drawer Content */}
                <motion.div 
-                  initial={{ x: '-100%' }}
-                  animate={{ x: 0 }}
-                  exit={{ x: '-100%' }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                  className="fixed left-0 top-0 bottom-0 w-[480px] bg-[#070708] border-r border-white/5 z-[101] flex flex-col shadow-2xl p-8"
+                  initial={{ x: '-100%', opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: '-100%', opacity: 0 }}
+                  transition={{ type: 'spring', damping: 30, stiffness: 200 }}
+                  className="fixed left-0 top-0 bottom-0 w-[480px] bg-[#050506]/90 backdrop-blur-3xl border-r border-white/10 z-[101] flex flex-col shadow-[20px_0_50px_rgba(0,0,0,0.5)] overflow-hidden"
                >
-                  <div className="flex items-center justify-between mb-8">
-                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                           <FolderOpen className="w-4 h-4 text-indigo-400" />
+                  {/* Ambient Glows */}
+                  <div className="absolute top-0 left-0 w-[500px] h-[300px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none -translate-y-1/2 -translate-x-1/4" />
+                  <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none translate-y-1/2 translate-x-1/4" />
+
+                  <div className="relative p-8 pb-4 z-10 flex flex-col h-full">
+                     <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                              <FolderOpen className="w-5 h-5 text-indigo-400" />
+                           </div>
+                           <div>
+                              <h2 className="text-sm font-black text-white uppercase tracking-widest leading-tight">Challenge Library</h2>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{problems.length} Dynamic FAANG challenges seeded</p>
+                              </div>
+                           </div>
                         </div>
-                        <div>
-                           <h2 className="text-xs font-black text-white uppercase tracking-widest">Challenge Library</h2>
-                           <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">60 Dynamic FAANG challenges seeded</p>
+                        <button 
+                           onClick={() => setIsDrawerOpen(false)}
+                           className="p-2.5 rounded-full bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all border border-white/5 hover:border-white/10"
+                        >
+                           <X className="w-4 h-4" />
+                        </button>
+                     </div>
+                     
+                     {/* Search and Filter */}
+                     <div className="space-y-4 mb-8 relative z-10">
+                        <div className="relative group">
+                           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-2xl blur-md opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500" />
+                           <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 z-10" />
+                           <input 
+                              type="text" 
+                              placeholder="SEARCH TOPIC OR COMPANY..." 
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="relative w-full bg-[#0a0a0c]/80 backdrop-blur-xl border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-[10px] font-black uppercase tracking-widest text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder:text-slate-600 shadow-inner"
+                           />
                         </div>
-                     </div>
-                     <button 
-                        onClick={() => setIsDrawerOpen(false)}
-                        className="p-2.5 rounded-xl bg-white/5 text-slate-400 hover:text-white transition-all border border-white/5"
-                     >
-                        <X className="w-4 h-4" />
-                     </button>
-                  </div>
-                  
-                  {/* Search and Filter */}
-                  <div className="space-y-4 mb-6">
-                     <div className="relative">
-                        <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input 
-                           type="text" 
-                           placeholder="SEARCH TOPIC OR COMPANY..." 
-                           value={searchTerm}
-                           onChange={(e) => setSearchTerm(e.target.value)}
-                           className="w-full bg-white/5 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-[10px] font-black uppercase tracking-widest text-white outline-none focus:border-indigo-500/50 transition-all placeholder:text-slate-600"
-                        />
-                     </div>
-                     <div className="flex gap-2">
-                        {['All', 'Easy', 'Medium', 'Hard'].map((d) => (
-                           <button 
-                              key={d}
-                              onClick={() => setFilterDifficulty(d as any)}
-                              className={cn(
-                                 "flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-widest border transition-all",
-                                 filterDifficulty === d ? "bg-indigo-500 text-white border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]" : "bg-white/5 text-slate-500 border-white/5 hover:border-white/10"
-                              )}
-                           >
-                              {d}
-                           </button>
-                        ))}
-                     </div>
-                  </div>
-                  
-                  {/* List of Problems inside Drawer */}
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                     {loadingProblems ? (
-                        Array.from({ length: 6 }).map((_, i) => (
-                           <div key={i} className="h-20 rounded-2xl bg-white/5 animate-pulse border border-white/5" />
-                        ))
-                     ) : problems
-                        .filter(p => (filterDifficulty === 'All' || p.difficulty === filterDifficulty) && p.title.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((p) => {
-                           const isSolved = solvedProblemIds.has(p._id);
-                           const rate = p.acceptanceRate || (Math.floor(Math.sin(p.title.length) * 15) + 52); // deterministic acceptance rate matching title
-                           return (
+                        <div className="flex gap-2">
+                           {['All', 'Easy', 'Medium', 'Hard'].map((d) => (
                               <button 
-                                 key={p._id} 
-                                 onClick={() => handleSelectProblem(p)}
+                                 key={d}
+                                 onClick={() => setFilterDifficulty(d as any)}
                                  className={cn(
-                                    "w-full p-5 rounded-2xl border text-left transition-all flex items-center justify-between group relative overflow-hidden",
-                                    selectedProblem?._id === p._id ? "bg-indigo-500/10 border-indigo-500/40" : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
+                                    "flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all duration-300",
+                                    filterDifficulty === d 
+                                       ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-transparent shadow-[0_4px_20px_rgba(99,102,241,0.4)]" 
+                                       : "bg-white/5 text-slate-400 border-white/5 hover:border-white/10 hover:bg-white/10 hover:text-white"
                                  )}
                               >
-                                 <div className="space-y-1 max-w-[80%]">
-                                    <div className="flex items-center gap-2">
-                                       <p className="text-[11px] font-black text-white uppercase truncate group-hover:text-indigo-300 transition-colors">{p.title}</p>
-                                       {isSolved && (
-                                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[6px] font-black uppercase flex items-center gap-0.5 shrink-0">
-                                             <UserCheck className="w-2 h-2" /> Solved
-                                          </span>
-                                       )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                       <span className={cn(
-                                          "text-[8px] font-black uppercase tracking-wider",
-                                          p.difficulty === 'Easy' ? "text-emerald-400" : p.difficulty === 'Medium' ? "text-amber-400" : "text-rose-400"
-                                       )}>{p.difficulty}</span>
-                                       <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">{p.category}</span>
-                                       <span className="text-[8px] text-slate-600 font-bold uppercase tracking-wider">Acc: {rate}%</span>
-                                    </div>
-                                    {p.companyTags && p.companyTags.length > 0 && (
-                                       <div className="flex gap-1 pt-1.5">
-                                          {p.companyTags.slice(0, 2).map((comp: string) => (
-                                             <span key={comp} className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-[6px] font-bold text-slate-400 uppercase tracking-widest">{comp}</span>
-                                          ))}
-                                       </div>
-                                    )}
-                                 </div>
-                                 <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                                 {d}
                               </button>
-                           );
-                        })}
+                           ))}
+                        </div>
+                     </div>
+                     
+                     {/* Problem List Area */}
+                     <div className="flex-1 overflow-y-auto pr-2 pb-8 space-y-4 custom-scrollbar relative z-10">
+                        {/* Recommendations */}
+                        {searchTerm === '' && filterDifficulty === 'All' && recommendations.length > 0 && (
+                           <div className="mb-8 space-y-3">
+                              <div className="flex items-center gap-2 mb-4 px-1">
+                                 <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                                 <h3 className="text-[11px] font-black text-amber-400 uppercase tracking-widest shadow-amber-400/20 drop-shadow-md">AI Recommended For You</h3>
+                              </div>
+                              {recommendations.map((p) => {
+                                 const isSolved = solvedProblemIds.has(p._id);
+                                 return (
+                                    <button 
+                                       key={`rec-${p._id}`} 
+                                       onClick={() => handleSelectProblem(p)}
+                                       className={cn(
+                                          "w-full p-5 rounded-2xl border text-left transition-all duration-300 flex items-center justify-between group relative overflow-hidden",
+                                          selectedProblem?._id === p._id 
+                                             ? "bg-amber-500/20 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.2)]" 
+                                             : "bg-gradient-to-br from-amber-500/10 via-[#0a0a0c]/80 to-[#0a0a0c]/90 border-amber-500/30 hover:border-amber-400/80 hover:shadow-[0_0_20px_rgba(245,158,11,0.15)]"
+                                       )}
+                                    >
+                                       <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all duration-500" />
+                                       <div className="relative z-10 flex-1">
+                                          <div className="flex items-center gap-2 mb-3">
+                                             <span className={cn(
+                                                "px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border",
+                                                p.difficulty === 'Easy' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                                                p.difficulty === 'Medium' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                                "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                             )}>
+                                                {p.difficulty}
+                                             </span>
+                                             <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-[8px] font-black uppercase tracking-wider">{p.category}</span>
+                                          </div>
+                                          <div className="flex items-center gap-3 mb-1.5">
+                                             <h3 className={cn("text-base font-black tracking-tight transition-colors", selectedProblem?._id === p._id ? "text-white" : "text-white group-hover:text-amber-400")}>{p.title}</h3>
+                                             {isSolved && <CheckCircle className="w-4 h-4 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />}
+                                          </div>
+                                          <p className="text-[10px] font-bold text-amber-400/80 uppercase tracking-widest flex items-center gap-1.5">
+                                             <Brain className="w-3 h-3" /> {p.recommendationReasons?.[0] || 'High Priority Mastery Target'}
+                                          </p>
+                                       </div>
+                                       <ChevronRight className={cn("w-5 h-5 transition-all z-10", selectedProblem?._id === p._id ? "text-amber-400 translate-x-1" : "text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1")} />
+                                    </button>
+                                 );
+                              })}
+                           </div>
+                        )}
+
+                        {/* Regular Problem List */}
+                        {loadingProblems ? (
+                           Array.from({ length: 6 }).map((_, i) => (
+                              <div key={i} className="h-24 rounded-2xl bg-white/5 animate-pulse border border-white/10" />
+                           ))
+                        ) : problems
+                           .filter(p => (filterDifficulty === 'All' || p.difficulty === filterDifficulty) && p.title.toLowerCase().includes(searchTerm.toLowerCase()))
+                           .map((p) => {
+                              const isSolved = solvedProblemIds.has(p._id);
+                              const rate = p.acceptanceRate !== undefined ? p.acceptanceRate : 0;
+                              return (
+                                 <button 
+                                    key={p._id} 
+                                    onClick={() => handleSelectProblem(p)}
+                                    className={cn(
+                                       "w-full p-4 rounded-2xl border text-left transition-all duration-300 flex items-center justify-between group relative overflow-hidden backdrop-blur-sm",
+                                       selectedProblem?._id === p._id 
+                                          ? "bg-indigo-500/15 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)]" 
+                                          : "bg-white/[0.02] border-white/10 hover:bg-white/[0.04] hover:border-white/20 hover:-translate-y-0.5"
+                                    )}
+                                 >
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/0 group-hover:bg-indigo-500/50 transition-colors duration-300" />
+                                    <div className="space-y-2 pl-2 flex-1">
+                                       <div className="flex items-center gap-2 mb-1">
+                                          <span className={cn(
+                                             "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border",
+                                             p.difficulty === 'Easy' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : 
+                                             p.difficulty === 'Medium' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : 
+                                             "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                          )}>{p.difficulty}</span>
+                                          {isSolved && (
+                                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                                                <CheckCircle className="w-2.5 h-2.5" /> Solved
+                                             </span>
+                                          )}
+                                       </div>
+                                       <h3 className="text-[13px] font-black text-white group-hover:text-indigo-300 transition-colors truncate tracking-wide">{p.title}</h3>
+                                       
+                                       <div className="flex items-center gap-2">
+                                          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{p.category}</span>
+                                          <span className="w-1 h-1 rounded-full bg-white/10" />
+                                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Acc: {rate}%</span>
+                                          {p.companyTags && p.companyTags.length > 0 && (
+                                             <>
+                                                <span className="w-1 h-1 rounded-full bg-white/10" />
+                                                <span className="text-[9px] text-indigo-400/80 font-bold uppercase tracking-wider truncate max-w-[100px]">{p.companyTags[0]}</span>
+                                             </>
+                                          )}
+                                       </div>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/20 group-hover:scale-110 transition-all duration-300">
+                                       <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-300" />
+                                    </div>
+                                 </button>
+                              );
+                           })}
+                     </div>
                   </div>
                </motion.div>
             </>
@@ -442,7 +614,14 @@ export default function CodingLabPage() {
                   <Code2 className="w-5 h-5 text-indigo-400" />
                </div>
                <div>
-                  <h1 className="text-sm font-black text-white uppercase tracking-widest">{selectedProblem?.title || 'Coding Lab'}</h1>
+                  <div className="flex items-center gap-2">
+                     <h1 className="text-sm font-black text-white uppercase tracking-widest">{selectedProblem?.title || 'Coding Lab'}</h1>
+                     {selectedProblem && solvedProblemIds.has(selectedProblem._id) && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase flex items-center gap-1 shrink-0 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                           <CheckCircle className="w-2.5 h-2.5" /> Solved
+                        </span>
+                     )}
+                  </div>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedProblem?.category || 'Algorithms'}</p>
                </div>
             </div>
@@ -457,6 +636,16 @@ export default function CodingLabPage() {
                <option value="cpp">C++</option>
                <option value="java">Java</option>
             </select>
+            <button 
+               onClick={() => {
+                  if (selectedProblem) setCode(selectedProblem.starterCode[language] || '');
+               }}
+               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest"
+               title="Reset to default code"
+            >
+               <RefreshCcw className="w-3.5 h-3.5" />
+               Reset
+            </button>
          </div>
 
          <div className="flex items-center gap-3">
@@ -520,7 +709,7 @@ export default function CodingLabPage() {
                            onClick={() => setIsDrawerOpen(true)}
                            className="w-full py-4 px-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all flex items-center justify-center gap-3 mb-4 shadow-[0_0_20px_rgba(99,102,241,0.05)] group animate-pulse"
                         >
-                           <FolderOpen className="w-4 h-4 group-hover:rotate-6 transition-transform" /> Browse Algorithmic Library (45 Challenges)
+                           <FolderOpen className="w-4 h-4 group-hover:rotate-6 transition-transform" /> Browse Algorithmic Library ({problems.length} Challenges)
                         </button>
 
                         {selectedProblem ? (
@@ -535,11 +724,18 @@ export default function CodingLabPage() {
                                     {selectedProblem.difficulty}
                                  </span>
                                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[9px] font-black uppercase text-slate-400">
-                                    Acceptance Rate: {selectedProblem.acceptanceRate || (Math.floor(Math.sin(selectedProblem.title.length) * 15) + 52)}%
+                                    Acceptance Rate: {selectedProblem.acceptanceRate !== undefined ? `${selectedProblem.acceptanceRate}%` : "N/A"}
                                  </span>
                               </div>
                               <div className="space-y-4">
-                                 <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{selectedProblem.title}</h2>
+                                 <div className="flex items-center gap-3">
+                                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{selectedProblem.title}</h2>
+                                    {solvedProblemIds.has(selectedProblem._id) && (
+                                       <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                                          <CheckCircle className="w-4 h-4" /> Solved
+                                       </span>
+                                    )}
+                                 </div>
                                  {selectedProblem.scenario && (
                                     <div className="p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-2 mb-4">
                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">⚡ Real-world Corporate Scenario</p>
@@ -612,18 +808,18 @@ export default function CodingLabPage() {
                         <div className="p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-4">
                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5"><Brain className="w-3.5 h-3.5" /> Optimal Complexity Target</h4>
                            <div className="p-4 rounded-xl bg-black/40 border border-white/5">
-                              <code className="text-sm font-mono text-white block">{selectedProblem?.optimalComplexity || "O(N) Time, O(1) Space"}</code>
+                              <code className="text-sm font-mono text-white block">{selectedProblem?.optimalComplexity || "N/A"}</code>
                            </div>
-                           <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                              To successfully execute at production-scale without triggering CPU locks or heap limitations, utilize optimized sliding pointers or dynamic frequency hashes.
-                           </p>
+                           {selectedProblem?.editorial && (
+                              <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                                 {selectedProblem.editorial}
+                              </p>
+                           )}
                         </div>
                         <div className="space-y-3">
                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Reference Solution ({language})</h4>
                            <pre className="p-5 rounded-2xl bg-white/5 border border-white/5 overflow-x-auto text-[10px] font-mono text-indigo-300 custom-scrollbar leading-relaxed">
-                              <code>{language === 'javascript' ? 
-                                 (selectedProblem?.starterCode?.javascript || "// Solution Code") : 
-                                 (selectedProblem?.starterCode?.python || "# Solution Code")}
+                              <code>{selectedProblem?.solutionCode?.[language] || (language === 'javascript' ? "// Solution Code Not Available" : "# Solution Code Not Available")}
                               </code>
                            </pre>
                         </div>
@@ -653,7 +849,7 @@ export default function CodingLabPage() {
                                     <p className="text-[9px] text-slate-600 font-bold uppercase mt-1">{new Date(sub.createdAt).toLocaleString()}</p>
                                  </div>
                                  <div className="text-right">
-                                    <span className="text-xs font-mono text-slate-400 font-bold">{sub.runtime ? `${(sub.runtime * 1000).toFixed(0)}ms` : "16ms"}</span>
+                                    <span className="text-xs font-mono text-slate-400 font-bold">{sub.runtime !== undefined && sub.runtime !== null ? `${(sub.runtime * 1000).toFixed(0)}ms` : "N/A"}</span>
                                  </div>
                               </div>
                            ))
@@ -667,21 +863,37 @@ export default function CodingLabPage() {
                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Community Discussion</h4>
                            <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 text-[8px] font-black uppercase tracking-widest">Active</span>
                         </div>
+
+                        <div className="flex flex-col gap-3 mb-6 bg-white/5 p-4 rounded-2xl border border-white/5">
+                           <textarea 
+                              value={newDiscussion}
+                              onChange={(e) => setNewDiscussion(e.target.value)}
+                              placeholder="Share your approach, constraints observed, or ask a question..."
+                              className="w-full bg-black/40 border border-white/5 rounded-xl p-4 text-xs text-white placeholder:text-slate-600 outline-none focus:border-indigo-500/50 transition-all resize-none h-24 custom-scrollbar"
+                           />
+                           <div className="flex justify-end">
+                              <GlowingButton onClick={handlePostDiscussion} disabled={postingDiscussion || !newDiscussion.trim()} className="h-9 px-5 text-[9px]">
+                                 {postingDiscussion ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-2" />} Post Insight
+                              </GlowingButton>
+                           </div>
+                        </div>
                         
                         <div className="space-y-4">
-                           {[
-                              { author: "Alex_FAANG_Dev", date: "2 hours ago", content: "Google interviewer asked me this exact problem last Wednesday. The sliding window frequency hash is critical here! Don't use basic nested loops as it fails on large scale packets." },
-                              { author: "byte_whisperer", date: "1 day ago", content: "Can we optimize space to O(1) if arrays are sorted? Yes, but sorting breaks O(N) time bound. Standard key-value mapping is the most robust way in production servers." },
-                              { author: "hft_engineer", date: "3 days ago", content: "Great real-world scenario description. This is exactly how we analyze trade book overlap spikes in our execution buffers!" }
-                           ].map((item, i) => (
-                              <div key={i} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-3">
-                                 <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-black text-indigo-300 uppercase">{item.author}</span>
-                                    <span className="text-[8px] text-slate-600 font-bold uppercase">{item.date}</span>
+                           {selectedProblem?.discussions && selectedProblem.discussions.length > 0 ? (
+                              selectedProblem.discussions.map((item: any, i: number) => (
+                                 <div key={i} className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                       <span className="text-[9px] font-black text-indigo-300 uppercase">{item.author}</span>
+                                       <span className="text-[8px] text-slate-600 font-bold uppercase">{item.timeAgo}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.content}</p>
                                  </div>
-                                 <p className="text-xs text-slate-300 leading-relaxed font-medium">{item.content}</p>
+                              ))
+                           ) : (
+                              <div className="p-8 rounded-2xl bg-white/5 border border-white/5 text-center space-y-2">
+                                 <p className="text-xs font-black text-slate-400 uppercase">No Discussions Yet</p>
                               </div>
-                           ))}
+                           )}
                         </div>
                      </motion.div>
                   )}
@@ -690,8 +902,8 @@ export default function CodingLabPage() {
                      <motion.div key="output" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                         {loading || submitting ? (
                            <div className="h-64 flex flex-col items-center justify-center gap-6">
-                              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center animate-spin">
-                                 <RefreshCcw className="w-8 h-8 text-indigo-400" />
+                              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                                 <RefreshCcw className="w-8 h-8 text-indigo-400 animate-spin" />
                               </div>
                               <div className="text-center space-y-2">
                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] animate-pulse">
@@ -711,6 +923,33 @@ export default function CodingLabPage() {
                                     <p className="text-[10px] font-bold opacity-60 uppercase">Execution Sequence Complete</p>
                                  </div>
                               </div>
+
+                              {output.status === 'Accepted' && output.telemetry && (
+                                 <div className="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                       <Sparkles className="w-5 h-5 text-indigo-400" />
+                                       <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest">Skill Inference Telemetry Report</h4>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                       <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
+                                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Time to Code</p>
+                                          <p className="text-sm font-black text-indigo-300">{output.telemetry.timeToFirstCode}s</p>
+                                       </div>
+                                       <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
+                                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Time</p>
+                                          <p className="text-sm font-black text-emerald-400">{output.telemetry.totalTime}s</p>
+                                       </div>
+                                       <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
+                                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Compile Attempts</p>
+                                          <p className="text-sm font-black text-amber-400">{output.telemetry.compileAttempts}</p>
+                                       </div>
+                                       <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
+                                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Hints Used</p>
+                                          <p className="text-sm font-black text-rose-400">{output.telemetry.hintsUsed}</p>
+                                       </div>
+                                    </div>
+                                 </div>
+                              )}
 
                               {output.results && (
                                  <div className="space-y-4">
@@ -788,21 +1027,42 @@ export default function CodingLabPage() {
                     <Terminal className="w-4 h-4 text-indigo-400" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Simulation Buffer</span>
                  </div>
-              </div>
-              <div className="flex items-center gap-6">
-                 <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em]">
-                    <Settings className="w-3 h-3" />
-                    Isolated Execution Environment
-                 </div>
+                 <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600 uppercase tracking-[0.2em]">
+                     <Settings className="w-3 h-3" />
+                     Isolated Execution Environment
+                  </div>
+               </div>
               </div>
            </div>
+
+            {selectedProblem?.recommendationReasons && selectedProblem.recommendationReasons.length > 0 && (
+               <div className="mx-8 mt-6 p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                     <Sparkles className="w-4 h-4 text-indigo-400" />
+                     <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Why Am I Seeing This Challenge?</h4>
+                  </div>
+                  <ul className="space-y-2">
+                     {selectedProblem.recommendationReasons.map((reason: string, i: number) => (
+                        <li key={i} className="text-xs text-indigo-200/80 flex items-center gap-2 font-medium">
+                           <CheckCircle className="w-3 h-3 text-emerald-400" />
+                           {reason}
+                        </li>
+                     ))}
+                  </ul>
+               </div>
+            )}
+
            <div className="flex-1">
               <Editor
                  height="100%"
                  language={language}
                  theme="vs-dark"
                  value={code}
-                 onChange={(val) => setCode(val || '')}
+                 onChange={(val) => {
+                   setCode(val || '');
+                   if (!firstKeystrokeAt) setFirstKeystrokeAt(Date.now());
+                 }}
                  options={{
                    fontSize: 16,
                    fontFamily: "'JetBrains Mono', monospace",
@@ -906,15 +1166,39 @@ export default function CodingLabPage() {
                                  </p>
                               </div>
 
-                              {selectedProblem?.hints && selectedProblem.hints.length > 0 ? (
-                                 selectedProblem.hints.map((h: string, idx: number) => (
-                                    <div key={idx} className="p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-2">
-                                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Hint {idx + 1}</p>
-                                       <p className="text-xs text-indigo-200/80 font-medium leading-relaxed">{h}</p>
-                                    </div>
-                                 ))
+                              {selectedProblem?.progressiveHints && selectedProblem.progressiveHints.length > 0 ? (
+                                 <div className="space-y-4">
+                                    {selectedProblem.progressiveHints.map((hint: any, idx: number) => {
+                                       const isRevealed = idx < hintsRevealed;
+                                       return (
+                                          <div key={idx} className={`p-5 rounded-2xl border transition-all ${isRevealed ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-white/[0.02] border-white/5 backdrop-blur-sm'}`}>
+                                             <div className="flex items-center justify-between mb-2">
+                                                <p className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isRevealed ? 'text-indigo-400' : 'text-slate-500'}`}>
+                                                   {isRevealed ? <Sparkles className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />} 
+                                                   Hint {idx + 1}: {hint.type}
+                                                </p>
+                                             </div>
+                                             {isRevealed ? (
+                                                <p className="text-xs text-indigo-200/80 font-medium leading-relaxed">{hint.content}</p>
+                                             ) : (
+                                                <div className="flex flex-col items-center justify-center py-4 space-y-3">
+                                                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Locked to preserve mastery score</p>
+                                                   {idx === hintsRevealed && (
+                                                      <button 
+                                                         onClick={() => setHintsRevealed(prev => prev + 1)}
+                                                         className="px-4 py-2 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 text-[10px] font-black uppercase tracking-wider transition-colors border border-indigo-500/20"
+                                                      >
+                                                         Reveal Next Hint
+                                                      </button>
+                                                   )}
+                                                </div>
+                                             )}
+                                          </div>
+                                       );
+                                    })}
+                                 </div>
                               ) : (
-                                 <p className="text-[10px] text-slate-500 uppercase font-black text-center py-12">No hints configured for this problem.</p>
+                                 <p className="text-[10px] text-slate-500 uppercase font-black text-center py-12">No progressive hints configured.</p>
                               )}
                            </div>
                         )

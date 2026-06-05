@@ -13,13 +13,7 @@ export const getDashboardRecommendations = async (stats: any, activity: any, use
     return response.data;
   } catch (error) {
     console.error('Error calling AI service for recommendations:', error);
-    return {
-      summary: "Keep practicing to unlock AI-driven insights and personalized growth roadmaps.",
-      recommendations: [
-        { title: "Start Mock Interview", description: "Take your first AI-moderated interview to begin tracking metrics.", action: "/room", priority: "High" }
-      ],
-      aiInsights: "Insufficient data for deep analysis. Complete more sessions to see skill-specific trends."
-    };
+    throw new Error('Failed to generate AI recommendations from service');
   }
 };
 

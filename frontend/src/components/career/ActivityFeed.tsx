@@ -20,7 +20,7 @@ export default function ActivityFeed() {
     queryKey: ['activityFeed'],
     queryFn: async () => {
       const res = await getActivityFeed();
-      return res.data.events as IntelligenceEvent[];
+      return (res.data.activity || []) as IntelligenceEvent[];
     },
     refetchInterval: 15000, // Poll every 15s per architecture spec
   });

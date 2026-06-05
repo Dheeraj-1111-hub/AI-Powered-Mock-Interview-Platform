@@ -7,6 +7,7 @@ import { executeCode } from '../services/execution';
 import { deepEqual } from '../services/execution/localRunner';
 import axios from 'axios';
 import User from '../models/User';
+import ActivityLog from '../models/ActivityLog';
 import logger from '../services/logger';
 import { syncCodeforcesProblems, enrichRawProblems } from '../services/problemImporter.service';
 import { emitSubmissionCompleted } from '../utils/eventBus';
@@ -35,7 +36,14 @@ export const enrichRaw = async (req: Request, res: Response) => {
 
 export const getProblems = async (req: Request, res: Response) => {
   try {
-    const problems = await CodingProblem.find().sort({ difficulty: 1 });
+    let problems = await CodingProblem.find().lean();
+    
+    // Sort by difficulty
+    problems = problems.sort((a: any, b: any) => {
+      const diffMap: any = { Easy: 1, Medium: 2, Hard: 3 };
+      return (diffMap[a.difficulty] || 0) - (diffMap[b.difficulty] || 0);
+    });
+
     res.json(problems);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch problems' });
@@ -65,7 +73,7 @@ export const runCode = async (req: Request, res: Response) => {
 export const submitCode = async (req: Request, res: Response) => {
   try {
     const userId = reqUser(req);
-    const { problemId, code, language } = req.body;
+    const { problemId, code, language, telemetry } = req.body;
     
     const problem = await CodingProblem.findById(problemId);
     if (!problem) return res.status(404).json({ message: 'Problem not found' });
@@ -122,10 +130,27 @@ export const submitCode = async (req: Request, res: Response) => {
       status: finalStatus,
       results,
       runtime: peakRuntime,
-      memory: peakMemory
+      memory: peakMemory,
+      telemetry
     });
 
     await submission.save();
+
+    await submission.save();
+
+    // TRIGGER DATABASE TRUTH EVENT (ActivityLog)
+    try {
+      await ActivityLog.create({
+        user: userId,
+        type: 'problem_solved',
+        xpAwarded: finalStatus === 'Accepted' ? (problem.difficulty === 'Easy' ? 10 : problem.difficulty === 'Medium' ? 20 : 30) : 0,
+        metadata: {
+          problemId: problem._id,
+          difficulty: problem.difficulty.toLowerCase() as 'easy' | 'medium' | 'hard',
+          score: finalStatus === 'Accepted' ? 100 : 0
+        }
+      });
+    } catch(err) { logger.error(`ActivityLog creation failed: ${err}`); }
 
     // Trigger Asynchronous Event Hook for Gamification, Analytics, and AI Review
     emitSubmissionCompleted(submission);
@@ -272,6 +297,44 @@ export const chatInterview = async (req: Request, res: Response) => {
   }
 };
 
+export const monitorInterview = async (req: Request, res: Response) => {
+  try {
+    const { sessionId, currentCode, language } = req.body;
+
+    const session = await InterviewSession.findById(sessionId);
+    if (!session) return res.status(404).json({ message: 'Interview session not found' });
+
+    const problem = await CodingProblem.findById(session.problem);
+    if (!problem) return res.status(404).json({ message: 'Problem not found' });
+
+    // Call FastAPI Interview Monitor endpoint
+    logger.info(`[Interview]: Calling AI interviewer monitor for session ${session._id}`);
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/interview/monitor`, {
+      problemDescription: problem.description,
+      code: currentCode || '',
+      language: language || 'javascript',
+      messages: session.messages.map(m => ({ role: m.role, content: m.content })),
+      tone: session.tone,
+      interviewerPersona: session.interviewerPersona
+    });
+
+    if (aiResponse.data.interrupt && aiResponse.data.message) {
+      session.messages.push({
+        role: 'interviewer',
+        content: aiResponse.data.message,
+        timestamp: new Date()
+      });
+      await session.save();
+      return res.json({ interrupt: true, session });
+    }
+
+    res.json({ interrupt: false });
+  } catch (error: any) {
+    logger.error(`Monitor interview error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to monitor interviewer', error: error.message });
+  }
+};
+
 export const finishInterview = async (req: Request, res: Response) => {
   try {
     const { sessionId, currentCode, language } = req.body;
@@ -296,17 +359,92 @@ export const finishInterview = async (req: Request, res: Response) => {
     // Save final scorecard details
     session.status = 'completed';
     session.feedbackScorecard = {
-      problemSolving: scorecard.problemSolving || 70,
-      optimization: scorecard.optimization || 70,
-      codeQuality: scorecard.codeQuality || 70,
+      accuracy: scorecard.accuracy || 70,
+      depth: scorecard.depth || 70,
       communication: scorecard.communication || 70,
-      feedbackSummary: scorecard.feedbackSummary || 'Evaluation complete.'
+      confidence: scorecard.confidence || 70,
+      practicality: scorecard.practicality || 70,
+      feedbackSummary: scorecard.feedbackSummary || 'Evaluation complete.',
+      overallReadiness: scorecard.overallReadiness || 50,
+      strongAreas: scorecard.strongAreas || [],
+      weakAreas: scorecard.weakAreas || [],
+      faangRecommendation: scorecard.faangRecommendation || 'Not Ready Yet',
+      estimatedTimeline: scorecard.estimatedTimeline || '12 weeks'
     };
     await session.save();
+
+    // Career OS Integration: Update User metrics
+    const user = await User.findById(session.user);
+    if (user && session.feedbackScorecard) {
+      user.interviewReadinessScore = session.feedbackScorecard.overallReadiness;
+      user.communicationScore = session.feedbackScorecard.communication;
+      
+      // Update Skill Graph based on strong/weak areas (simple delta integration)
+      if (!user.skillGraph) user.skillGraph = new Map<string, number>();
+      
+      session.feedbackScorecard.strongAreas.forEach((skill: string) => {
+        const current = user.skillGraph.get(skill) || 50;
+        user.skillGraph.set(skill, Math.min(100, current + 5));
+      });
+      
+      session.feedbackScorecard.weakAreas.forEach((skill: string) => {
+        const current = user.skillGraph.get(skill) || 50;
+        user.skillGraph.set(skill, Math.max(0, current - 5));
+      });
+
+      // Phase 4: Cross-Feature Validation (Cache invalidation)
+      user.readinessLastComputed = null;
+      await user.save();
+    }
+
+    // TRIGGER DATABASE TRUTH EVENT (ActivityLog)
+    try {
+      await ActivityLog.create({
+        user: session.user,
+        type: 'interview_completed',
+        xpAwarded: session.feedbackScorecard.overallReadiness * 10,
+        metadata: {
+          interviewId: session._id,
+          score: session.feedbackScorecard.overallReadiness,
+          difficulty: 'medium'
+        }
+      });
+    } catch(err) { logger.error(`ActivityLog creation failed: ${err}`); }
 
     res.json(session);
   } catch (error: any) {
     logger.error(`Finish interview error: ${error.message}`);
     res.status(500).json({ message: 'Failed to complete interview grading', error: error.message });
+  }
+};
+
+export const addDiscussion = async (req: Request, res: Response) => {
+  try {
+    const userId = reqUser(req);
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+       return res.status(400).json({ message: 'Discussion content is required' });
+    }
+
+    const problem = await CodingProblem.findById(req.params.id);
+    if (!problem) return res.status(404).json({ message: 'Problem not found' });
+
+    const newDiscussion = {
+      author: user.name || 'Anonymous Developer',
+      timeAgo: 'Just now',
+      content: content.trim()
+    };
+
+    problem.discussions = problem.discussions || [];
+    problem.discussions.unshift(newDiscussion);
+    await problem.save();
+
+    res.json(problem.discussions);
+  } catch (error: any) {
+    logger.error(`Add discussion error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to post discussion', error: error.message });
   }
 };

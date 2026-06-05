@@ -5,42 +5,49 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { 
-  Activity, Brain, Target, Flame, ChevronRight, Code2, PlaySquare, Loader2, Sparkles, AlertTriangle,
-  TrendingUp, Calendar, Trophy, Zap, ArrowUpRight, Search, Plus
-} from 'lucide-react';
+  Pulse, Brain, Target, Fire, CaretRight, Code, CircleNotch, Sparkle,
+  TrendUp, CalendarBlank, Trophy, ArrowUpRight, Plus, ChartLineUp, TerminalWindow, Graph, Info
+} from '@phosphor-icons/react';
 
 import { AuthContext } from '../services/auth.service';
 import { fetchDashboard } from '../services/api.service';
-import { SpotlightCard } from '../components/ui/SpotlightCard';
-import { GlowingButton } from '../components/ui/GlowingButton';
 import { Navbar } from '../components/shared/Navbar';
-import { cn } from '../utils/cn';
+import { cn } from '../utils';
 import { DashboardSkeleton } from '../components/dashboard/DashboardSkeleton';
 
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
+};
+
 interface DashboardData {
-  stats: {
-    totalInterviews: number;
-    totalCoding: number;
-    averageScore: number;
-    streak: number;
+  intelligenceIndex?: {
+    score: number;
+    breakdown: any;
   };
-  trends: Array<{ name: string; score: number }>;
-  topicAverages: Array<{ topic: string; average: number; attempts: number }>;
-  insights: {
-    weakTopics: string[];
-    improvementPlan: string;
-    quickActions: Array<{ title: string; action: string; type: string }>;
-    memory?: {
-      growthRate: string;
-    };
+  telemetry?: {
+    streak: { current: number; longest: number; expectedGain: string };
+    simulations: { total: number; completed: number; abandoned: number };
+    mastery: { score: number; level: string; neededForNext: number };
   };
-  activityTimeline: Array<{
+  trajectory?: Array<{ day: string; score: number; reason: string }>;
+  skillDNA?: Array<{ topic: string; score: number; evidence: any }>;
+  persistentMemory?: { observation: string; evidence: string[] };
+  recentInterviews?: Array<{
     id: string;
-    type: string;
-    title: string;
-    description: string;
+    role: string;
+    score: number;
     date: string;
-    tags: string[];
   }>;
 }
 
@@ -68,381 +75,416 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  // Derive unlocked badges from milestone events
-  const unlockedBadges = data?.activityTimeline?.filter(a => a.type === 'milestone') || [];
-  // Ensure we show at least some empty slots if less than 3
-  const displayBadges = [...unlockedBadges];
-  while (displayBadges.length < 3) {
-      displayBadges.push(null as any);
-  }
-
-  const growthRate = data?.insights?.memory?.growthRate || '0%';
-  const isPositiveGrowth = !growthRate.startsWith('-');
+  const ii = data?.intelligenceIndex?.score || 0;
+  const growthRate = data?.telemetry?.streak?.expectedGain || '+0%';
+  const isPositiveGrowth = growthRate.includes('+');
 
   return (
-    <div className="min-h-screen bg-[#030303] text-slate-100 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#030303] text-slate-100 font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none -z-10"></div>
       <Navbar />
       
-      {/* Immersive Background */}
-      <div className="fixed inset-0 bg-grid-white pointer-events-none opacity-40" />
-      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[150px] rounded-full mix-blend-screen pointer-events-none animate-pulse" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-fuchsia-600/10 blur-[150px] rounded-full mix-blend-screen pointer-events-none animate-pulse" />
-
-      <main className="relative z-10 pt-36 pb-24 px-6 max-w-[1600px] mx-auto">
+      <main className="relative z-10 pt-32 pb-24 px-6 lg:px-8 max-w-7xl mx-auto w-full">
         
         {/* Cinematic Header */}
-        <div className="mb-12 flex flex-col xl:flex-row xl:items-end justify-between gap-8">
+        <div className="mb-12 flex flex-col xl:flex-row xl:items-end justify-between gap-6 pb-6">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">System Live</span>
-              </div>
-              <div className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-2">
-                <Sparkles className="w-3 h-3 text-indigo-400" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">AI Active</span>
+              <div className="px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/10 flex items-center gap-2 backdrop-blur-md">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Live Engine</span>
               </div>
             </div>
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-3">
-              Intelligence <span className="text-gradient">Briefing</span>
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight mb-2 text-white">
+              Intelligence Briefing
             </h1>
-            <p className="text-lg text-slate-400 max-w-2xl font-medium">
-              Welcome, {user?.name?.split(' ')[0] || 'Candidate'}. Your career metrics are trending <span className={cn(isPositiveGrowth ? "text-emerald-400" : "text-amber-400", "font-bold")}>{growthRate}</span> this week.
+            <p className="text-sm text-slate-400 max-w-2xl font-medium">
+              Welcome back, <span className="text-slate-200">{user?.name?.split(' ')[0] || 'Candidate'}</span>. Your platform velocity is trending <span className={cn(isPositiveGrowth ? "text-indigo-400" : "text-slate-300", "font-bold")}>{growthRate}</span> this week.
             </p>
           </motion.div>
 
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             className="flex items-center gap-4"
           >
-            <div className="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
-               <Calendar className="w-4 h-4 text-slate-500" />
-               <span className="text-sm font-bold text-slate-300">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
-            </div>
-            <GlowingButton onClick={() => {
-              navigate('/career');
-            }} className="h-14 px-8">
-              <Plus className="w-5 h-5 mr-2" /> Resume Career OS
-            </GlowingButton>
+            <button onClick={() => navigate('/career')} className="group flex items-center gap-2 h-10 px-5 rounded-lg bg-white text-black text-sm font-bold hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+              Resume Operations <ArrowUpRight size={16} weight="bold" className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </button>
           </motion.div>
         </div>
 
-        {/* BENTO GRID LAYOUT */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-12 gap-6">
+        {/* MODULAR BENTO GRID */}
+        <motion.div 
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-5"
+        >
           
-          {/* 1. PRIMARY METRICS - 4 CARDS */}
-          <div className="xl:col-span-3 space-y-6">
+          {/* PRIMARY METRICS - ROW 1 */}
+          <div className="col-span-1 lg:col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
              <MetricCard 
-                label="AI Mastery Score" 
-                value={data?.stats.averageScore || 0} 
-                suffix="/100"
-                trend={data?.stats.averageScore ? "+Active" : "New"}
+                label="Intelligence Index" 
+                value={data?.intelligenceIndex?.score || 0} 
+                suffix="PT"
+                trend={data?.intelligenceIndex?.score ? "+Active" : "New"}
                 icon={Brain} 
-                color="indigo" 
+                color="indigo"
+                evidence={data?.intelligenceIndex?.evidence}
              />
              <MetricCard 
                 label="Active Streak" 
-                value={data?.stats.streak || 0} 
-                suffix="DAYS"
-                trend={data?.stats.streak ? "Fire" : "Stable"}
-                icon={Flame} 
-                color="orange" 
+                value={data?.telemetry?.streak?.current || 0} 
+                suffix="D"
+                trend={data?.telemetry?.streak?.current ? "Fire" : "Stable"}
+                icon={Fire} 
+                color="amber"
              />
-          </div>
-
-          <div className="xl:col-span-3 space-y-6">
              <MetricCard 
-                label="Interview Count" 
-                value={data?.stats.totalInterviews || 0} 
-                suffix="SESSIONS"
-                trend={data?.stats.totalInterviews ? `+${data.stats.totalInterviews}` : "Start"}
+                label="Simulations" 
+                value={data?.telemetry?.simulations?.total || 0} 
+                suffix="X"
+                trend={data?.telemetry?.simulations?.total ? `+${data.telemetry.simulations.total}` : "Start"}
                 icon={Target} 
-                color="emerald" 
+                color="emerald"
              />
              <MetricCard 
-                label="Code Challenges" 
-                value={data?.stats.totalCoding || 0} 
-                suffix="SOLVED"
-                trend={data?.stats.totalCoding ? `+${data.stats.totalCoding}` : "Start"}
-                icon={Code2} 
-                color="blue" 
+                label="Mastery Level" 
+                value={data?.telemetry?.mastery?.score || 0} 
+                suffix="PT"
+                trend={data?.telemetry?.mastery?.level || "Beginner"}
+                icon={TerminalWindow} 
+                color="fuchsia"
+                evidence={data?.telemetry?.mastery?.evidence}
              />
           </div>
 
-          {/* 2. PERFORMANCE CHART - LARGE */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="xl:col-span-6"
-          >
-            <SpotlightCard className="h-full p-8 flex flex-col">
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Growth Velocity</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time Performance Index</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-indigo-500" />
-                    <span className="text-[10px] font-bold text-slate-400">MASTERY</span>
+          {/* MAIN COLUMN - CHARTS & ACTIVITY */}
+          <div className="col-span-1 lg:col-span-8 flex flex-col gap-5">
+            
+            {/* VELOCITY CHART */}
+            <motion.div variants={fadeUp} className="bg-indigo-950/10 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden group hover:bg-indigo-950/20 transition-all">
+              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none -translate-y-1/2 translate-x-1/3 group-hover:bg-indigo-500/10 transition-colors" />
+              
+              <div className="flex items-center justify-between mb-8 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center">
+                    <ChartLineUp size={20} className="text-slate-300" />
                   </div>
-                  <TrendingUp className="w-5 h-5 text-indigo-400" />
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Growth Velocity</h3>
+                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-widest mt-0.5">Real-time Performance Index</p>
+                  </div>
+                </div>
+                <div className="px-3 py-1.5 rounded-md bg-white/[0.03] border border-white/5 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">Tracking</span>
                 </div>
               </div>
               
-              <div className="w-full h-[280px] mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data?.trends || []}>
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="#ffffff20" 
-                      fontSize={10} 
-                      tickLine={false} 
-                      axisLine={false}
-                      dy={10}
-                    />
-                    <YAxis hide domain={[0, 'dataMax + 20']} />
-                    <Tooltip 
-                       content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="glass-panel px-4 py-2 rounded-xl border-white/10 shadow-2xl">
-                              <p className="text-[10px] font-black text-slate-500 uppercase mb-1">{payload[0].payload.name}</p>
-                              <p className="text-lg font-black text-white">{payload[0].value} XP</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="score" 
-                      stroke="#6366f1" 
-                      strokeWidth={4} 
-                      fill="url(#chartGradient)" 
-                      animationDuration={2000}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </SpotlightCard>
-          </motion.div>
-
-          {/* 3. AI ACTION CENTER - WIDE */}
-          <div className="xl:col-span-8">
-            <SpotlightCard className="p-8 border-indigo-500/20 overflow-hidden relative group h-full">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px] group-hover:bg-indigo-600/15 transition-colors" />
-              
-              <div className="flex flex-col lg:flex-row gap-10 relative z-10 h-full">
-                <div className="lg:w-1/3">
-                  <div className="w-16 h-16 rounded-[24px] bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 mb-6 shadow-[0_0_40px_rgba(99,102,241,0.2)]">
-                    <Sparkles className="w-8 h-8 text-indigo-400" />
-                  </div>
-                  <h3 className="text-2xl font-black text-white mb-4">Strategic Advisor</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      <span className="text-[10px] font-black text-slate-300 uppercase">Priority One: System Design</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="lg:w-2/3 border-l border-white/5 lg:pl-10 flex flex-col justify-center">
-                  <p className="text-xl text-slate-300 font-medium leading-relaxed mb-8 italic">
-                    "{data?.insights.improvementPlan}"
-                  </p>
-                  
-                  <div className="flex flex-wrap gap-4">
-                    {data?.insights.quickActions.map((action, i) => (
-                      <button
-                        key={i}
-                        onClick={() => navigate(action.action)}
-                        className={cn(
-                          "px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2",
-                          action.type === 'primary' 
-                            ? "bg-indigo-500 text-white shadow-lg hover:bg-indigo-400 hover:scale-105 active:scale-95" 
-                            : "bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:scale-105 active:scale-95"
-                        )}
-                      >
-                        {action.title}
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </SpotlightCard>
-          </div>
-
-          {/* 4. ACHIEVEMENTS & TOPICS - TALL */}
-          <div className="xl:col-span-4 space-y-6">
-             {/* Actual Unlocked Badges */}
-             <SpotlightCard className="p-6 bg-gradient-to-br from-amber-500/5 to-transparent border-amber-500/20">
-                <div className="flex items-center justify-between mb-6">
-                   <h3 className="text-sm font-black uppercase tracking-widest text-amber-500">Milestone Badges</h3>
-                   <Trophy className="w-5 h-5 text-amber-500" />
-                </div>
-                <div className="flex gap-4">
-                   {displayBadges.slice(0, 3).map((badge, idx) => (
-                      <div 
-                         key={idx} 
-                         className={cn(
-                            "w-12 h-12 rounded-full flex items-center justify-center border transition-all",
-                            badge 
-                               ? "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]" 
-                               : "bg-slate-800/50 border-white/5 opacity-30 grayscale"
-                         )}
-                         title={badge?.title || "Locked Milestone"}
-                      >
-                         <Trophy className="w-5 h-5" />
-                      </div>
-                   ))}
-                </div>
-                {unlockedBadges.length > 0 && (
-                   <p className="text-[10px] text-amber-500/70 uppercase tracking-widest mt-4 font-black">
-                      Latest: {unlockedBadges[0].title}
-                   </p>
-                )}
-             </SpotlightCard>
-
-             {/* Focus Areas */}
-             <SpotlightCard className="p-6">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">Domain Analysis</h3>
-                <div className="space-y-5">
-                   {data?.topicAverages?.slice(0, 3).map((topic, i) => (
-                     <div key={i}>
-                        <div className="flex justify-between items-center mb-2">
-                           <span className="text-xs font-bold text-slate-200">{topic.topic}</span>
-                           <span className="text-xs font-black text-white">{Math.round(topic.average)}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                           <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${topic.average}%` }}
-                              transition={{ duration: 1, delay: i * 0.2 }}
-                              className={cn("h-full rounded-full", i === 0 ? "bg-rose-500" : "bg-indigo-500")} 
-                           />
-                        </div>
-                     </div>
-                   ))}
-                   {(!data?.topicAverages || data.topicAverages.length === 0) && (
-                      <p className="text-xs text-slate-500 font-mono">No domain data. Complete an interview to analyze.</p>
-                   )}
-                </div>
-             </SpotlightCard>
-          </div>
-
-          {/* 5. FEED - BOTTOM WIDE */}
-          <div className="xl:col-span-12">
-            <SpotlightCard className="p-8">
-               <div className="flex items-center justify-between mb-10">
-                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">Recent Activity</h3>
-                  <div className="flex items-center gap-3">
-                     <button onClick={() => navigate('/analytics')} className="text-xs font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors px-4 py-2 bg-indigo-500/10 rounded-xl">
-                       View Full History &rarr;
+              <div className="w-full h-[320px] relative z-10">
+                {(!data?.trajectory || data.trajectory.length < 2) ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl bg-white/[0.01]">
+                     <Graph size={32} className="text-slate-600 mb-4" />
+                     <h4 className="text-white font-bold text-sm mb-2 text-center">Velocity Tracking Inactive</h4>
+                     <p className="text-xs text-slate-500 mb-6 text-center max-w-sm font-medium">
+                        Complete your first technical evaluation to initialize the data engine.
+                     </p>
+                     <button onClick={() => navigate('/interview')} className="h-9 px-5 rounded-lg bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-600 transition-colors shadow-[0_0_15px_rgba(99,102,241,0.3)]">
+                        Initialize Tracking
                      </button>
                   </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data?.trajectory || []} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="velocityGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity={0.5} />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#ffffff05" vertical={false} />
+                      <XAxis 
+                        dataKey="day" 
+                        stroke="#ffffff20" 
+                        fontSize={10} 
+                        fontWeight={600}
+                        tickLine={false} 
+                        axisLine={false}
+                        dy={15}
+                      />
+                      <YAxis 
+                        stroke="#ffffff20" 
+                        fontSize={10} 
+                        fontWeight={600}
+                        tickLine={false} 
+                        axisLine={false}
+                        dx={-10}
+                      />
+                      <Tooltip 
+                         content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-[#111] px-4 py-3 rounded-xl border border-white/10 shadow-2xl backdrop-blur-xl">
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{payload[0].payload.day}</p>
+                                <p className="text-base font-black text-white">{payload[0].value} <span className="text-[10px] text-slate-500">PT</span></p>
+                                <p className="text-[10px] font-medium text-slate-400 mt-1">{payload[0].payload.reason}</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="score" 
+                        stroke="#818cf8" 
+                        strokeWidth={3} 
+                        fill="url(#velocityGradient)" 
+                        animationDuration={1500}
+                        activeDot={{ r: 6, fill: "#ffffff", stroke: "#818cf8", strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </motion.div>
+
+            {/* ACTIVITY FEED */}
+            <motion.div variants={fadeUp} className="bg-[#0a0a0a] border border-white/5 rounded-2xl p-6">
+               <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/10 flex items-center justify-center">
+                      <Pulse size={16} className="text-slate-300" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-widest">System Log</h3>
+                  </div>
+                  <button onClick={() => navigate('/analytics')} className="text-[11px] font-bold text-slate-500 hover:text-white transition-colors">
+                    VIEW ALL
+                  </button>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+               <div className="space-y-3">
                   <AnimatePresence>
-                     {data?.activityTimeline?.slice(0, 5).map((item, i) => (
+                     {data?.recentInterviews?.slice(0, 4).map((item, i) => (
                         <motion.div 
                           key={item.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: i * 0.1 }}
-                          className="p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group cursor-pointer flex flex-col justify-between"
+                          className="p-4 rounded-xl bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-colors flex items-center gap-4 group cursor-pointer"
                         >
-                           <div>
-                              <div className="flex items-center gap-3 mb-4">
-                                 <div className={cn(
-                                   "w-10 h-10 rounded-xl flex items-center justify-center border shrink-0",
-                                   item.type === 'interview' ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : 
-                                   item.type === 'coding' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
-                                   item.type === 'milestone' ? "bg-amber-500/10 border-amber-500/20 text-amber-400" :
-                                   "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400"
-                                 )}>
-                                    {item.type === 'interview' ? <Target className="w-5 h-5" /> : 
-                                     item.type === 'coding' ? <Code2 className="w-5 h-5" /> : 
-                                     item.type === 'milestone' ? <Trophy className="w-5 h-5" /> : 
-                                     <Brain className="w-5 h-5" />}
-                                 </div>
-                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                    {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                 </span>
-                              </div>
-                              <h4 className="font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors line-clamp-1">{item.title}</h4>
-                              <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{item.description}</p>
+                           <div className="w-10 h-10 rounded-lg flex items-center justify-center border shrink-0 transition-colors bg-indigo-500/10 border-indigo-500/20 text-indigo-400">
+                               <Target size={16} weight="fill" />
                            </div>
-                           {item.tags && item.tags.length > 0 && (
-                              <div className="mt-4 flex flex-wrap gap-1">
-                                 {item.tags.map(t => (
-                                    <span key={t} className="text-[9px] font-black uppercase tracking-widest text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded">
-                                       {t}
-                                    </span>
-                                 ))}
-                              </div>
-                           )}
+                           <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-bold text-slate-200 truncate group-hover:text-white transition-colors">Simulation: {item.role}</h4>
+                              <p className="text-[12px] text-slate-500 truncate mt-0.5 font-medium">Score: {item.score}%</p>
+                           </div>
+                           <div className="shrink-0 text-right hidden sm:block">
+                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+                                 {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                           </div>
                         </motion.div>
                      ))}
                   </AnimatePresence>
                   
-                  {(!data?.activityTimeline || data.activityTimeline.length === 0) && (
-                      <div className="col-span-full py-12 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-2xl">
-                          <Activity className="w-8 h-8 text-slate-600 mb-3" />
-                          <p className="text-slate-400 font-medium">No recent activity detected.</p>
+                  {(!data?.recentInterviews || data.recentInterviews.length === 0) && (
+                      <div className="py-8 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl bg-white/[0.01]">
+                          <p className="text-[11px] font-bold text-slate-600 uppercase tracking-widest mb-4">No events logged</p>
+                          <button onClick={() => navigate('/interview')} className="h-8 px-4 rounded-md bg-white/[0.05] border border-white/10 text-slate-300 text-[11px] font-bold hover:bg-white/10 transition-colors">
+                             Start Session
+                          </button>
                       </div>
                   )}
                </div>
-            </SpotlightCard>
+            </motion.div>
           </div>
 
-        </div>
+          {/* SIDEBAR - INTELLIGENCE COMMAND */}
+          <div className="col-span-1 lg:col-span-4 flex flex-col gap-5">
+            
+            {/* AI STRATEGIC ADVISOR */}
+            <motion.div variants={fadeUp} className="bg-indigo-950/10 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden group hover:bg-indigo-950/20 transition-all">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/20 transition-colors" />
+              
+              <div className="flex items-center gap-3 mb-6 relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                  <Sparkle size={20} weight="fill" className="text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">AI Advisor</h3>
+                  <p className="text-[11px] font-medium text-indigo-400/70 uppercase tracking-widest mt-0.5">Automated Strategy</p>
+                </div>
+              </div>
+
+              <div className="relative z-10">
+                {(!data?.persistentMemory) ? (
+                  <>
+                    <p className="text-sm text-slate-400 font-medium leading-relaxed mb-6">
+                      System standing by. I need behavioral data to generate an optimization path. Let's begin.
+                    </p>
+                    <div className="space-y-2">
+                      <div className="p-3 bg-[#111] border border-white/5 rounded-xl group/btn hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={() => navigate('/interview')}>
+                         <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Priority 1</p>
+                         <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold text-slate-200">Baseline Interview</p>
+                            <CaretRight size={14} className="text-slate-500 group-hover/btn:text-indigo-400 transition-colors" />
+                         </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl mb-6 shadow-inner">
+                      <p className="text-[13px] text-slate-300 font-medium leading-relaxed italic">
+                        "{data.persistentMemory.observation}"
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <div 
+                          onClick={() => navigate('/analytics')}
+                          className="p-3 bg-[#111] border border-white/5 rounded-xl group/btn hover:border-white/20 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">High Priority</p>
+                              <p className="text-sm font-bold text-slate-200">View Drill-down Audit</p>
+                           </div>
+                           <ArrowUpRight size={14} className="text-slate-600 group-hover/btn:text-white transition-colors" />
+                        </div>
+                        <div 
+                          onClick={() => navigate('/interview')}
+                          className="p-3 bg-[#111] border border-white/5 rounded-xl group/btn hover:border-white/20 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Suggested</p>
+                              <p className="text-sm font-bold text-slate-200">Target Weakness in Simulation</p>
+                           </div>
+                           <ArrowUpRight size={14} className="text-slate-600 group-hover/btn:text-white transition-colors" />
+                        </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+
+            {/* DOMAIN ANALYSIS */}
+            <motion.div variants={fadeUp} className="bg-amber-950/5 border border-amber-500/20 rounded-2xl p-6 flex-1 flex flex-col hover:bg-amber-950/10 transition-all">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <Target size={16} className="text-amber-400" />
+                </div>
+                <h3 className="text-sm font-bold text-amber-500 uppercase tracking-widest">Domain Matrix</h3>
+              </div>
+
+              <div className="space-y-6 flex-1">
+                 {data?.skillDNA?.slice(0, 4).map((topic, i) => (
+                   <div key={i} className="group">
+                      <div className="flex justify-between items-end mb-2">
+                         <span className="text-[13px] font-bold text-slate-300 group-hover:text-white transition-colors">{topic.topic}</span>
+                         <span className="text-xs font-black text-slate-400">{Math.round(topic.score)}<span className="text-[10px]">PT</span></span>
+                      </div>
+                      <div className="h-1.5 w-full bg-black/50 border border-white/5 rounded-full overflow-hidden p-[1px]">
+                         <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${topic.score}%` }}
+                            transition={{ duration: 1, delay: i * 0.2 }}
+                            className={cn("h-full rounded-full", i === 0 ? "bg-amber-400" : "bg-amber-500/40")} 
+                         />
+                      </div>
+                   </div>
+                 ))}
+                  {(!data?.skillDNA || data.skillDNA.length === 0) && (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
+                       <CircleNotch size={24} className="text-slate-500 animate-spin mb-3" />
+                       <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Awaiting Data</p>
+                    </div>
+                 )}
+              </div>
+            </motion.div>
+
+          </div>
+
+        </motion.div>
       </main>
     </div>
   );
 }
 
-const MetricCard = ({ label, value, suffix, trend, icon: Icon, color }: any) => {
-  const colorMap: any = {
-    indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20 shadow-indigo-500/10",
-    orange: "text-orange-400 bg-orange-500/10 border-orange-500/20 shadow-orange-500/10",
-    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 shadow-emerald-500/10",
-    blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-blue-500/10"
+const MetricCard = ({ label, value, suffix, trend, icon: Icon, color, evidence }: any) => {
+  const [showEvidence, setShowEvidence] = useState(false);
+  const colorMap: Record<string, string> = {
+    indigo: "border-indigo-500/20 bg-indigo-950/10 hover:bg-indigo-950/20",
+    amber: "border-amber-500/20 bg-amber-950/10 hover:bg-amber-950/20",
+    emerald: "border-emerald-500/20 bg-emerald-950/10 hover:bg-emerald-950/20",
+    fuchsia: "border-fuchsia-500/20 bg-fuchsia-950/10 hover:bg-fuchsia-950/20",
+  };
+  const glowMap: Record<string, string> = {
+    indigo: "bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-400",
+    amber: "bg-amber-500/10 group-hover:bg-amber-500/20 text-amber-400",
+    emerald: "bg-emerald-500/10 group-hover:bg-emerald-500/20 text-emerald-400",
+    fuchsia: "bg-fuchsia-500/10 group-hover:bg-fuchsia-500/20 text-fuchsia-400",
   };
 
+  const themeClass = colorMap[color] || colorMap.indigo;
+  const glowClass = glowMap[color] || glowMap.indigo;
+
   return (
-    <motion.div whileHover={{ y: -5 }}>
-      <SpotlightCard className="p-6 relative overflow-hidden">
-        <div className="flex items-center gap-4 mb-6">
-          <div className={cn("w-12 h-12 rounded-[18px] flex items-center justify-center border", colorMap[color])}>
-            <Icon className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{label}</p>
-            <div className="flex items-center gap-2">
-               <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-md", colorMap[color])}>{trend}</span>
-            </div>
-          </div>
+    <motion.div variants={fadeUp} className={cn("rounded-2xl p-5 relative overflow-hidden group transition-all", themeClass)}>
+      <div className={cn("absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] pointer-events-none transition-colors", glowClass.split(' ')[0], glowClass.split(' ')[1])} />
+      
+      <div className="relative z-10 flex items-start justify-between mb-4">
+        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center border transition-colors", glowClass.split(' ')[0], "border-white/5")}>
+           <Icon size={16} className={glowClass.split(' ')[2]} />
         </div>
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-4xl font-black text-white">{value}</h3>
-          <span className="text-xs font-bold text-slate-500 uppercase">{suffix}</span>
+        <div className="px-2 py-1 rounded bg-black/30 border border-white/5 flex items-center gap-1.5">
+           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{trend}</span>
         </div>
-      </SpotlightCard>
+      </div>
+      
+      <div className="relative z-10 flex items-center justify-between">
+        <div>
+          <div className="flex items-baseline gap-1">
+            <h3 className="text-3xl font-black tracking-tight text-white">{value}</h3>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{suffix}</span>
+          </div>
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1 group-hover:text-slate-400 transition-colors">{label}</p>
+        </div>
+        {evidence && (
+           <button 
+              onMouseEnter={() => setShowEvidence(true)}
+              onMouseLeave={() => setShowEvidence(false)}
+              className="w-6 h-6 rounded-md bg-white/5 border border-white/10 flex items-center justify-center text-slate-500 hover:text-white hover:border-white/20 transition-all"
+           >
+              <Info size={12} weight="bold" />
+           </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+         {showEvidence && evidence && (
+            <motion.div 
+               initial={{ opacity: 0, y: 5 }}
+               animate={{ opacity: 1, y: 0 }}
+               exit={{ opacity: 0, y: 5 }}
+               transition={{ duration: 0.15 }}
+               className="absolute inset-x-0 bottom-0 p-3 bg-black/95 backdrop-blur-xl border-t border-white/10 z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]"
+            >
+               <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                  <Database size={10} /> Data Provenance
+               </p>
+               <p className="text-[10px] text-slate-300 leading-relaxed font-medium">{evidence}</p>
+            </motion.div>
+         )}
+      </AnimatePresence>
     </motion.div>
   );
 };

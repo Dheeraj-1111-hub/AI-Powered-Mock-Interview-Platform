@@ -33,6 +33,14 @@ export interface ICodingSubmission extends Document {
     interviewerFeedback?: string;
     betterApproach?: string;
   };
+  telemetry?: {
+    timeToFirstCode: number; // Time in seconds from problem opened to first keystroke
+    totalThinkingTime: number; // Time in seconds spent not typing
+    totalTime: number; // Total time spent on problem
+    compileAttempts: number;
+    hintsUsed: number;
+    editorialViewed: boolean;
+  };
   runtime?: number;
   memory?: number;
   createdAt: Date;
@@ -62,6 +70,14 @@ const codingSubmissionSchema = new Schema<ICodingSubmission>({
     score: Number,
     interviewerFeedback: String,
     betterApproach: String
+  },
+  telemetry: {
+    timeToFirstCode: Number,
+    totalThinkingTime: Number,
+    totalTime: Number,
+    compileAttempts: Number,
+    hintsUsed: Number,
+    editorialViewed: { type: Boolean, default: false }
   },
   runtime: Number,
   memory: Number,

@@ -21,11 +21,13 @@ interface Week {
   focus: string;
   topics: string[];
   problems: number;
+  specificProblems?: string[];
   difficulty: string;
   mockInterviews: number;
   status?: 'locked' | 'active' | 'completed' | 'struggling' | 'regenerated' | 'skipped';
   confidenceScore?: number;
   decisionReasoning?: string;
+  priorityReason?: string;
   completedAt?: string;
   keyMilestone?: string;
   tasks?: WeekTask[];
@@ -182,13 +184,25 @@ export default function WeeklyRoadmap({ weeklyPlan, completedWeeks, readinessSco
                       <p className="text-[10px] text-indigo-300/60 font-medium mt-2 italic">🎯 {w.keyMilestone}</p>
                     )}
 
-                    {w.decisionReasoning && (
+                    {(w.priorityReason || w.decisionReasoning) && (
                       <div className="mt-3 p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-2">
                         <Brain className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-0.5">AI Reasoning</span>
-                          <p className="text-xs text-slate-300">{w.decisionReasoning}</p>
+                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-0.5">Priority Reason</span>
+                          <p className="text-xs text-slate-300">{w.priorityReason || w.decisionReasoning}</p>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Specific Problems List (Always visible) */}
+                    {w.specificProblems && w.specificProblems.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {w.specificProblems.map(p => (
+                          <div key={p} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                            <Code2 className="w-3 h-3" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">{p}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
 
@@ -290,6 +304,9 @@ export default function WeeklyRoadmap({ weeklyPlan, completedWeeks, readinessSco
                           <div className="col-span-2 flex items-center gap-2 text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">
                             <Clock className="w-3 h-3" /> This week's targets
                           </div>
+                          
+                          {/* Specific Problems List (Moved up) */}
+                          
                           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-center">
                             <p className="text-xl font-black text-white">{w.problems}</p>
                             <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Problems</p>

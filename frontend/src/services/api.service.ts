@@ -142,8 +142,18 @@ export const fetchProblems = () =>
     headers: authHeader(),
   });
 
+export const fetchProblemRecommendations = () =>
+  client.get('/career/recommend-problem', {
+    headers: authHeader(),
+  });
+
 export const fetchProblemById = (id: string) =>
   client.get(`/codes/problems/${id}`, {
+    headers: authHeader(),
+  });
+
+export const addProblemDiscussion = (id: string, content: string) =>
+  client.post(`/codes/problems/${id}/discussions`, { content }, {
     headers: authHeader(),
   });
 
@@ -244,6 +254,11 @@ export const finishCodingInterview = (payload: { sessionId: string; currentCode?
     headers: authHeader(),
   });
 
+export const monitorCodingInterview = (payload: { sessionId: string; currentCode?: string; language?: string }) =>
+  client.post('/codes/interview/monitor', payload, {
+    headers: authHeader(),
+  });
+
 export const fetchSubmissionAuditStatus = (id: string) =>
   client.get(`/codes/submissions/${id}/audit-status`, {
     headers: authHeader(),
@@ -261,6 +276,9 @@ export const initCareerProfile = (payload: any) =>
 
 export const saveOnboardingProgress = (payload: { step: number; data: any }) =>
   client.post('/career/profile/save-progress', payload, { headers: authHeader() });
+
+export const resetCareerOS = () =>
+  client.post('/career/reset', {}, { headers: authHeader() });
 
 export const adaptRoadmap = () =>
   client.post('/career/roadmap/adapt', {}, { headers: authHeader() });
@@ -282,5 +300,11 @@ export const getActivityFeed = () =>
 
 export const getEngineeringDNA = () =>
   client.get('/career/dna', { headers: authHeader() });
+
+export const previewStrategyShift = (payload: { newMode: string }) =>
+  client.post('/career/strategy/preview', payload, { headers: authHeader() });
+
+export const shiftStrategy = (payload: { targetCompany: string; targetRole: string; newMode: string; whyStrategyChanged: string }) =>
+  client.post('/career/strategy/shift', payload, { headers: authHeader() });
 
 export default client;

@@ -4,6 +4,7 @@ import CodingProblem from '../models/CodingProblem';
 import User from '../models/User';
 import axios from 'axios';
 import logger from '../services/logger';
+import { computeCareerIntelligence } from '../services/careerIntelligence/readinessEngine';
 
 class SubmissionEventBus extends EventEmitter {}
 
@@ -46,10 +47,25 @@ const triggerGamification = async (submission: ICodingSubmission) => {
        // Update solved list here, central service handles XP and streak
        user.solvedProblems.push(problemId);
        
-       // Topic Mastery
-       const currentMastery = user.topicMastery.get(problem.category) || 0;
-       user.topicMastery.set(problem.category, currentMastery + 1);
-       
+       // Calculate Mastery Delta via Telemetry
+       const telemetry = submission.telemetry;
+       let masteryDelta = problem.difficulty === 'Hard' ? 3 : problem.difficulty === 'Medium' ? 2 : 1;
+
+       if (telemetry) {
+         if (telemetry.hintsUsed === 0) masteryDelta += 1;
+         if (telemetry.compileAttempts <= 2) masteryDelta += 1;
+         if (telemetry.totalTime < 600) masteryDelta += 1; // < 10 mins
+         
+         if (telemetry.hintsUsed > 2) masteryDelta -= 1;
+         if (telemetry.editorialViewed) masteryDelta = Math.min(masteryDelta, 1);
+       }
+       masteryDelta = Math.max(1, masteryDelta);
+
+
+
+       // Phase 4: Cross-Feature Validation
+       // Clear the readiness cache so the Profile and Dashboard recalculate instantly
+       user.readinessLastComputed = undefined;
        await user.save();
 
        // Let the central brain handle the event log and XP applying
@@ -57,9 +73,9 @@ const triggerGamification = async (submission: ICodingSubmission) => {
          userId,
          'skill_improved',
          `Solved: ${problem.title}`,
-         `Completed a ${problem.difficulty} problem in ${problem.category}.`,
+         `Completed a ${problem.difficulty} problem in ${problem.category}. Gained +${masteryDelta} Mastery.`,
          problem.category,
-         undefined, // delta
+         masteryDelta,
          { xpEarned: xpGained }
        );
     }
@@ -85,7 +101,9 @@ const triggerAsyncAiAudit = async (submission: ICodingSubmission) => {
       code: submission.code,
       language: submission.language,
       problemDescription: problem.description,
-      staticAnalysis
+      staticAnalysis,
+      executionStatus: submission.status,
+      executionResults: submission.results
     });
 
     const parsedReview = typeof aiResponse.data.review === 'string' 

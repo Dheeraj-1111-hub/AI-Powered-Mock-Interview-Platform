@@ -39,8 +39,20 @@ function App() {
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center gap-8 relative z-10"
         >
-           <div className="w-20 h-20 rounded-[40px] bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-[0_0_80px_rgba(99,102,241,0.2)] animate-pulse">
-              <span className="font-black text-3xl text-indigo-400">IQ</span>
+           <div className="w-20 h-20 rounded-[40px] bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-[0_0_80px_rgba(99,102,241,0.2)] animate-pulse relative">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 drop-shadow-[0_0_16px_rgba(99,102,241,0.8)]">
+                <path d="M12.9868 2.0003L4.48682 12.0003H11.9868L10.9868 21.0003L20.4868 9.5003H12.9868L12.9868 2.0003Z" fill="url(#sparkGradientApp)" stroke="url(#sparkStrokeApp)" strokeWidth="1.5" strokeLinejoin="round"/>
+                <defs>
+                  <linearGradient id="sparkGradientApp" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#818cf8" />
+                    <stop offset="1" stopColor="#3730a3" />
+                  </linearGradient>
+                  <linearGradient id="sparkStrokeApp" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#e0e7ff" />
+                    <stop offset="1" stopColor="#4f46e5" />
+                  </linearGradient>
+                </defs>
+              </svg>
            </div>
            <div className="flex flex-col items-center gap-3">
               <p className="text-[10px] font-black uppercase tracking-[0.6em] text-slate-500">Establishing Neural Link</p>

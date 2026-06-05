@@ -4,40 +4,99 @@ export interface IResumeAnalysis extends Document {
   user: Types.ObjectId;
   resumeUrl?: string;
   filename: string;
-  atsScore: number;
-  roleMatch: number;
-  keywordGaps: string[];
-  strengths: string[];
-  weaknesses: string[];
-  rewriteSuggestions: string[];
-  bulletImprovements: Array<{
-    original: string;
-    improved: string;
-    reason: string;
-  }>;
-  recruiterInsights: string;
+  parsedText: string;
   jobDescription?: string;
 
-  sectionScores: {
-    experience: number;
-    education: number;
-    skills: number;
-    summary: number;
+  globalAts: {
+    format: number;
+    keywords: number;
+    sections: number;
+    readability: number;
+    parsing: number;
+    total: number;
   };
 
-  radarScores: {
-    impact: number;
+  jobAlignment: {
+    score: number;
+    presentKeywords: string[];
+    missingKeywords: string[];
+  };
+
+  recruiterImpact: {
+    score: number;
+    metrics: {
+      actionVerbs: number;
+      leadership: number;
+      impactMetrics: number;
+      ownership: number;
+      technicalDepth: number;
+    };
+  };
+
+  projectQuality: {
+    score: number;
+    evaluations: Array<{
+      projectName: string;
+      complexity: number;
+      techDepth: number;
+      architecture: number;
+      impact: number;
+      reason: string;
+    }>;
+  };
+
+  dynamicGuidelines: Array<{
+    rule: string;
+    status: 'passed' | 'failed';
+    message: string;
+  }>;
+
+  sectionQuality: Array<{
+    name: string;
+    score: number;
+    feedback: string;
+  }>;
+
+  skillDNA: {
     keywords: number;
+    impact: number;
     brevity: number;
     actionVerbs: number;
     formatting: number;
   };
 
-  keywordHighlighting: Array<{
-    keyword: string;
-    type: string;
-    status: string;
+  bulletImprovements: Array<{
+    original: string;
+    improved: string;
+    changes: Array<{
+      type: string; // e.g., 'Added Metric', 'Action Verb'
+      description: string;
+    }>;
   }>;
+
+  keywordIntelligence: {
+    present: string[];
+    missing: string[];
+    overused: string[];
+    weak: string[];
+  };
+
+  strategicStrengths: string[];
+  criticalGaps: Array<{
+    topic: string;
+    reason: string;
+  }>;
+
+  recruiterFeedback: {
+    strengths: string[];
+    concerns: string[];
+    recommendation: 'Interview Worthy' | 'Borderline' | 'Needs Work';
+  };
+
+  sixSecondScan: {
+    good: string[];
+    bad: string[];
+  };
 
   createdAt: Date;
 }
@@ -48,137 +107,103 @@ const resumeAnalysisSchema = new Schema<IResumeAnalysis>({
     ref: 'User',
     required: true,
   },
+  resumeUrl: String,
+  filename: { type: String, required: true },
+  parsedText: { type: String, default: '' },
+  jobDescription: { type: String, default: '' },
 
-  resumeUrl: {
-    type: String,
+  globalAts: {
+    format: { type: Number, default: 0 },
+    keywords: { type: Number, default: 0 },
+    sections: { type: Number, default: 0 },
+    readability: { type: Number, default: 0 },
+    parsing: { type: Number, default: 0 },
+    total: { type: Number, default: 0 },
   },
 
-  filename: {
-    type: String,
-    required: true,
+  jobAlignment: {
+    score: { type: Number, default: 0 },
+    presentKeywords: [String],
+    missingKeywords: [String],
   },
 
-  atsScore: {
-    type: Number,
-    required: true,
-  },
-
-  roleMatch: {
-    type: Number,
-    default: 0,
-  },
-
-  keywordGaps: {
-    type: [String],
-    default: [],
-  },
-
-  strengths: {
-    type: [String],
-    default: [],
-  },
-
-  weaknesses: {
-    type: [String],
-    default: [],
-  },
-
-  rewriteSuggestions: {
-    type: [String],
-    default: [],
-  },
-  
-  bulletImprovements: [
-    {
-      original: String,
-      improved: String,
-      reason: String
+  recruiterImpact: {
+    score: { type: Number, default: 0 },
+    metrics: {
+      actionVerbs: { type: Number, default: 0 },
+      leadership: { type: Number, default: 0 },
+      impactMetrics: { type: Number, default: 0 },
+      ownership: { type: Number, default: 0 },
+      technicalDepth: { type: Number, default: 0 },
     }
-  ],
-
-  jobDescription: {
-    type: String,
-    default: ''
   },
 
-  recruiterInsights: {
-    type: String,
-    default: '',
+  projectQuality: {
+    score: { type: Number, default: 0 },
+    evaluations: [{
+      projectName: String,
+      complexity: Number,
+      techDepth: Number,
+      architecture: Number,
+      impact: Number,
+      reason: String
+    }]
   },
 
-  sectionScores: {
-    experience: {
-      type: Number,
-      default: 0,
-    },
+  dynamicGuidelines: [{
+    rule: String,
+    status: String,
+    message: String
+  }],
 
-    education: {
-      type: Number,
-      default: 0,
-    },
+  sectionQuality: [{
+    name: String,
+    score: Number,
+    feedback: String
+  }],
 
-    skills: {
-      type: Number,
-      default: 0,
-    },
-
-    summary: {
-      type: Number,
-      default: 0,
-    },
+  skillDNA: {
+    keywords: { type: Number, default: 0 },
+    impact: { type: Number, default: 0 },
+    brevity: { type: Number, default: 0 },
+    actionVerbs: { type: Number, default: 0 },
+    formatting: { type: Number, default: 0 }
   },
 
-  radarScores: {
-    impact: {
-      type: Number,
-      default: 0,
-    },
+  bulletImprovements: [{
+    original: String,
+    improved: String,
+    changes: [{
+      type: { type: String },
+      description: String
+    }]
+  }],
 
-    keywords: {
-      type: Number,
-      default: 0,
-    },
-
-    brevity: {
-      type: Number,
-      default: 0,
-    },
-
-    actionVerbs: {
-      type: Number,
-      default: 0,
-    },
-
-    formatting: {
-      type: Number,
-      default: 0,
-    },
+  keywordIntelligence: {
+    present: [String],
+    missing: [String],
+    overused: [String],
+    weak: [String]
   },
 
-  keywordHighlighting: [
-    {
-      keyword: {
-        type: String,
-        default: '',
-      },
+  strategicStrengths: [String],
+  criticalGaps: [{
+    topic: String,
+    reason: String
+  }],
 
-      // REMOVED ENUM TO PREVENT AI VALIDATION ERRORS
-      type: {
-        type: String,
-        default: 'skill',
-      },
-
-      status: {
-        type: String,
-        default: 'present',
-      },
-    },
-  ],
-
-  createdAt: {
-    type: Date,
-    default: Date.now,
+  recruiterFeedback: {
+    strengths: [String],
+    concerns: [String],
+    recommendation: String
   },
+
+  sixSecondScan: {
+    good: [String],
+    bad: [String]
+  },
+
+  createdAt: { type: Date, default: Date.now }
 });
 
 resumeAnalysisSchema.index({ user: 1, createdAt: -1 });

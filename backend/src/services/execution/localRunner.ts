@@ -50,13 +50,7 @@ const extractFunctionName = (code: string): string => {
   return 'solve';
 };
 
-// Emulated memory estimator for realism
-const estimateMemory = (code: string, logsCount: number): number => {
-  let baseKb = 12000 + Math.floor(Math.random() * 8000); // 12MB - 20MB standard Node footprint
-  baseKb += code.length * 2; 
-  baseKb += logsCount * 12;
-  return baseKb;
-};
+
 
 export const runJSLocal = async (code: string, input: string): Promise<any> => {
   const logs: string[] = [];
@@ -106,6 +100,7 @@ export const runJSLocal = async (code: string, input: string): Promise<any> => {
   `;
 
   const startTime = process.hrtime.bigint();
+  const startMem = process.memoryUsage().heapUsed;
   try {
     const script = new vm.Script(wrappedCode);
     
@@ -114,7 +109,9 @@ export const runJSLocal = async (code: string, input: string): Promise<any> => {
     const rawResult = await promise;
     
     const endTime = process.hrtime.bigint();
+    const endMem = process.memoryUsage().heapUsed;
     const runtimeSec = Number(endTime - startTime) / 1000000000;
+    const memoryUsedKb = Math.max(0, (endMem - startMem) / 1024);
     
     const formattedResult = typeof rawResult === 'object' ? JSON.stringify(rawResult) : String(rawResult);
 
@@ -124,13 +121,15 @@ export const runJSLocal = async (code: string, input: string): Promise<any> => {
       compile_output: '',
       status: 'Accepted',
       time: runtimeSec,
-      memory: estimateMemory(code, logs.length),
+      memory: memoryUsedKb,
       returnValue: rawResult,
       formattedResult
     };
   } catch (error: any) {
     const endTime = process.hrtime.bigint();
+    const endMem = process.memoryUsage().heapUsed;
     const runtimeSec = Number(endTime - startTime) / 1000000000;
+    const memoryUsedKb = Math.max(0, (endMem - startMem) / 1024);
     
     let status = 'Runtime Error';
     if (error.message.includes('script execution timed out')) {
@@ -145,7 +144,7 @@ export const runJSLocal = async (code: string, input: string): Promise<any> => {
       compile_output: error.stack || '',
       status,
       time: runtimeSec,
-      memory: estimateMemory(code, logs.length)
+      memory: memoryUsedKb
     };
   }
 };
@@ -220,7 +219,7 @@ if __name__ == '__main__':
             compile_output: '',
             status: 'Accepted',
             time: runtimeSec,
-            memory: estimateMemory(code, 0),
+            memory: 0,
             returnValue: rawReturnValue,
             formattedResult: parsedResult
           });
@@ -231,7 +230,7 @@ if __name__ == '__main__':
             compile_output: stderr.trim(),
             status: exitCode === null ? 'Time Limit Exceeded' : 'Runtime Error',
             time: runtimeSec,
-            memory: estimateMemory(code, 0)
+            memory: 0
           });
         }
       });
@@ -258,7 +257,7 @@ if __name__ == '__main__':
         compile_output: result.error.message,
         status: 'Runtime Error',
         time: 0.05,
-        memory: 12000
+        memory: 0
       };
     }
 
@@ -271,7 +270,7 @@ if __name__ == '__main__':
       compile_output: err.stack,
       status: 'Runtime Error',
       time: 0.05,
-      memory: 12000
+      memory: 0
     };
   }
 };

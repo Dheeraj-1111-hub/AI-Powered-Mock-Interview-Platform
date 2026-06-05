@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from typing import Optional
 from pydantic import BaseModel
 import pdfplumber
@@ -10,7 +10,8 @@ from prompts.core_prompts import (
     RESUME_ANALYSIS_PROMPT, INTERVIEW_GEN_PROMPT, EVALUATION_PROMPT,
     FOLLOW_UP_PROMPT, CODE_INTELLIGENCE_PROMPT, CAREER_INTELLIGENCE_PROMPT,
     CAREER_PROFILE_INIT_PROMPT, ADAPTIVE_ROADMAP_PROMPT, MENTOR_V2_SYSTEM_PROMPT,
-    MENTOR_PERSONAS, PERSONA_BEHAVIORS, TODAY_ENGINE_PROMPT
+    MENTOR_PERSONAS, PERSONA_BEHAVIORS, TODAY_ENGINE_PROMPT, PROACTIVE_INTERRUPT_PROMPT,
+    INTERVIEW_SUMMARY_PROMPT
 )
 import json
 
@@ -48,12 +49,17 @@ class EvaluateRequest(BaseModel):
     role: str
     transcript: Optional[list] = None
     roundType: Optional[str] = 'behavioral'
+    skill: Optional[str] = 'General'
+    latencyMs: Optional[int] = None
+    voiceMetrics: Optional[dict] = None
 
 class CodeReviewRequest(BaseModel):
     code: str
     language: str
     problemDescription: str
     staticAnalysis: Optional[dict] = None
+    executionStatus: Optional[str] = None
+    executionResults: Optional[list] = None
 
 class ChallengeRequest(BaseModel):
     role: str
@@ -83,11 +89,17 @@ class FollowUpRequest(BaseModel):
     roundName: str
     prevQuestion: str
     prevAnswer: str
+    transcript: list = []
     persona: str = 'Professional'
 
+class InterviewSummaryRequest(BaseModel):
+    transcript: list
+    role: str
+
 class CareerProfileInitRequest(BaseModel):
-    targetRole: str
+    targetRole: str = 'Software Engineer'
     targetCompany: str = ''
+    timeline: str = '12 months'
     currentYear: str = 'junior'
     dsaComfort: float = 5.0
     systemDesignComfort: float = 3.0
@@ -95,9 +107,10 @@ class CareerProfileInitRequest(BaseModel):
     weakTopics: list[str] = []
     strongTopics: list[str] = []
     persona: str = 'faang_engineer'
+    targetWeekCount: int = 12
 
 class AdaptiveRoadmapRequest(BaseModel):
-    targetRole: str
+    targetRole: str = 'Software Engineer'
     targetCompany: str = ''
     persona: str = 'faang_engineer'
     startingFromWeek: int = 1
@@ -150,6 +163,24 @@ Instructions:
     response_text = call_groq(system_prompt, json.dumps(chat_history) if chat_history else "Let's begin the interview.")
     return {"message": response_text.strip()}
 
+@router.post('/interview/monitor')
+async def interview_monitor(request: InterviewChatRequest):
+    prompt = PROACTIVE_INTERRUPT_PROMPT.format(
+        interviewerPersona=request.interviewerPersona,
+        tone=request.tone,
+        problemDescription=request.problemDescription,
+        language=request.language,
+        code=request.code
+    )
+    result = call_groq(prompt, json_mode=True)
+    try:
+        start = result.find('{')
+        end = result.rfind('}') + 1
+        parsed = json.loads(result[start:end])
+        return parsed
+    except:
+        return {"interrupt": False, "message": ""}
+
 @router.post('/interview/finish')
 async def finish_interview(request: FinishInterviewRequest):
     system_prompt = """
@@ -158,11 +189,17 @@ Analyze the candidate's final code and the conversational chat history to produc
 
 You MUST return exactly a JSON object matching this structure:
 {
-    "problemSolving": integer rating between 1 and 100,
-    "optimization": integer rating between 1 and 100,
-    "codeQuality": integer rating between 1 and 100,
+    "accuracy": integer rating between 1 and 100,
+    "depth": integer rating between 1 and 100,
     "communication": integer rating between 1 and 100,
-    "feedbackSummary": "A detailed multi-paragraph performance evaluation summarizing their strengths, weaknesses, and direct technical areas for career growth."
+    "confidence": integer rating between 1 and 100,
+    "practicality": integer rating between 1 and 100,
+    "feedbackSummary": "A detailed multi-paragraph performance evaluation summarizing their strengths, weaknesses, and direct technical areas for career growth.",
+    "overallReadiness": integer rating between 1 and 100,
+    "strongAreas": ["list", "of", "strong", "skills"],
+    "weakAreas": ["list", "of", "weak", "skills"],
+    "faangRecommendation": "Ready" | "Not Ready Yet" | "Close",
+    "estimatedTimeline": "X weeks"
 }
 
 Do NOT wrap the output in markdown code blocks or add any other text. Return ONLY the raw valid JSON string.
@@ -182,7 +219,7 @@ Dialogue History:
     return json.loads(clean_text)
 
 @router.post('/resume')
-async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optional[str] = Form(None)):
+async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optional[str] = Form(None), profileData: Optional[str] = Form(None)):
     text = ''
     filename = resume.filename.lower()
     
@@ -201,16 +238,120 @@ async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optiona
     if not text.strip():
         return {"error": "Could not extract text from the file."}
 
-    prompt = RESUME_ANALYSIS_PROMPT.format(text=text, jobDescription=jobDescription or "General Career Analysis")
+    prompt = RESUME_ANALYSIS_PROMPT.format(
+        text=text, 
+        jobDescription=jobDescription or "General Career Analysis",
+        profileData=profileData or "No specific career profile provided."
+    )
     result = call_groq(prompt, json_mode=True)
     
     try:
         start = result.find('{')
         end = result.rfind('}') + 1
         parsed_result = json.loads(result[start:end])
+        
+        # --- DETERMINISTIC OVERRIDES ---
+        # 1. Job Alignment Math
+        align = parsed_result.get('jobAlignment', {})
+        intel = parsed_result.get('keywordIntelligence', {})
+        
+        # Combine all possible extracted keywords from the LLM
+        all_jd_keywords = set()
+        for kw in (align.get('presentKeywords', []) + align.get('missingKeywords', []) + intel.get('present', []) + intel.get('missing', [])):
+            if len(kw) > 1: all_jd_keywords.add(kw)
+            
+        real_present = []
+        real_missing = []
+        text_lower = text.lower()
+        
+        for kw in all_jd_keywords:
+            if kw.lower() in text_lower:
+                real_present.append(kw)
+            else:
+                real_missing.append(kw)
+                
+        present = len(real_present)
+        missing = len(real_missing)
+        total_keywords = present + missing
+        
+        if 'jobAlignment' not in parsed_result: parsed_result['jobAlignment'] = {}
+        parsed_result['jobAlignment']['presentKeywords'] = real_present
+        parsed_result['jobAlignment']['missingKeywords'] = real_missing
+        
+        if total_keywords > 0:
+            score = int(round((present / total_keywords) * 100))
+            # If the user matched >88% but missing is > 0, cap at 88
+            if score > 88 and missing > 0: score = 88
+            parsed_result['jobAlignment']['score'] = score
+        else:
+            parsed_result['jobAlignment']['score'] = 50
+
+        # 2. ATS Score Math
+        text_lower = text.lower()
+        ats_score = 30
+        sections_found = 0
+        if "education" in text_lower: sections_found += 1
+        if "skills" in text_lower or "technologies" in text_lower: sections_found += 1
+        if "experience" in text_lower or "employment" in text_lower: sections_found += 1
+        if "projects" in text_lower: sections_found += 1
+        ats_score += (sections_found * 10)
+        
+        failed_rules = [r for r in parsed_result.get('dynamicGuidelines', []) if r.get('status') == 'failed']
+        format_validity = 40
+        
+        # Penalize if metrics are missing from the resume text
+        has_metrics = any(char.isdigit() for char in text) and '%' in text
+        
+        if len(failed_rules) == 0: 
+            ats_score += 30 if has_metrics else 20
+            format_validity = 95
+        elif len(failed_rules) <= 1: 
+            ats_score += 15
+            format_validity = 85
+        
+        # Calculate actual ATS based strictly on extracted metrics
+        if 'globalAts' not in parsed_result: parsed_result['globalAts'] = {}
+        
+        # Ensure it doesn't exceed 100, but allow it to be what it actually calculated
+        parsed_result['globalAts']['total'] = min(ats_score, 100)
+        parsed_result['globalAts']['sections'] = min(int((sections_found / 4) * 100), 100)
+        parsed_result['globalAts']['format'] = format_validity
+        parsed_result['globalAts']['parsing'] = 90 if len(text) > 200 else 15
+
+        # We completely removed the hardcoded 'Project Quality Boost (88)' and 'Recruiter Impact Boost (80)'
+        # Let the LLM's actual parsed metrics dictate the score.
+
+        # 5. Missing / Standout Section Enforcement
+        if 'sixSecondScan' not in parsed_result: parsed_result['sixSecondScan'] = {}
+        
+        # Override Standouts
+        standouts = []
+        if 'llm' in text_lower or 'generative ai' in text_lower or 'agents' in text_lower:
+            standouts.append("Strong alignment with AI-native development (LLMs, RAG, Multi-Agent Systems).")
+        if 'react' in text_lower and ('node' in text_lower or 'fastapi' in text_lower):
+            standouts.append("Strong full-stack engineering background.")
+        if 'technical head' in text_lower or 'lead' in text_lower:
+            standouts.append("Demonstrated leadership and project management experience.")
+        if len(standouts) > 0:
+            parsed_result['sixSecondScan']['good'] = standouts
+
+        # Override Missing
+        missing_section = []
+        if len(real_missing) > 0:
+            missing_section.append(f"JD requirements not explicitly found: {', '.join(real_missing[:3])}")
+        if not has_metrics:
+            missing_section.append("No quantified project impact metrics (e.g., 'Reduced latency by 30%')")
+        if 'cursor' not in text_lower and 'copilot' not in text_lower:
+            missing_section.append("No explicit AI coding tools mentioned (Cursor, Copilot, Claude)")
+            
+        if len(missing_section) > 0:
+            parsed_result['sixSecondScan']['bad'] = missing_section
+        
+        parsed_result['parsedText'] = text
         return {'analysis': parsed_result}
-    except:
-        return {'analysis': result}
+    except Exception as e:
+        print(f"Resume JSON Parse Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse resume analysis JSON")
 
 @router.post('/generate')
 async def generate_interview(request: dict):
@@ -243,8 +384,9 @@ async def generate_interview(request: dict):
         start = result.find('{')
         end = result.rfind('}') + 1
         return {'plan': json.loads(result[start:end])}
-    except:
-        return {'plan': result}
+    except Exception as e:
+        print(f"Generate Error: {e} | Raw: {result}")
+        raise HTTPException(status_code=500, detail="Failed to generate interview plan")
 
 @router.post('/evaluate')
 async def evaluate_answer(request: EvaluateRequest):
@@ -259,11 +401,18 @@ async def evaluate_answer(request: EvaluateRequest):
             code=request.answer
         )
     else:
+        telemetry_context = ""
+        if request.latencyMs:
+            telemetry_context += f"Latency to Answer: {request.latencyMs}ms.\n"
+        if request.voiceMetrics:
+            telemetry_context += f"Voice Analytics: WPM={request.voiceMetrics.get('wpm')}, Filler Words={request.voiceMetrics.get('fillerWordCount')}.\n"
+        
         prompt = EVALUATION_PROMPT.format(
             question=request.question,
             answer=request.answer,
-            behavior=behavior,
-            transcript=json.dumps(request.transcript) if request.transcript else "New session."
+            skill=request.skill,
+            transcript=json.dumps(request.transcript) if request.transcript else "New session.",
+            telemetry=telemetry_context if telemetry_context else "No real-time telemetry recorded."
         )
     
     result = call_groq(prompt, json_mode=True)
@@ -273,7 +422,7 @@ async def evaluate_answer(request: EvaluateRequest):
         return {'evaluation': json.loads(result[start:end])}
     except Exception as e:
         print(f"Eval Error: {e} | Raw: {result}")
-        return {'evaluation': {"score": 50, "mistakes": ["AI processing error"]}}
+        raise HTTPException(status_code=500, detail="Failed to evaluate answer")
 
 @router.post('/follow-up')
 async def follow_up_question(request: FollowUpRequest):
@@ -284,7 +433,8 @@ async def follow_up_question(request: FollowUpRequest):
         behavior=behavior,
         roundName=request.roundName,
         prevQuestion=request.prevQuestion,
-        prevAnswer=request.prevAnswer
+        prevAnswer=request.prevAnswer,
+        transcript=json.dumps(request.transcript) if request.transcript else "New session."
     )
     result = call_groq(prompt, json_mode=True)
     try:
@@ -293,13 +443,39 @@ async def follow_up_question(request: FollowUpRequest):
         return json.loads(result[start:end])
     except:
         return {"text": result, "intent": "Contextual deep-dive"}
+
+@router.post('/interview/summary')
+async def interview_summary(request: InterviewSummaryRequest):
+    prompt = INTERVIEW_SUMMARY_PROMPT.format(
+        role=request.role,
+        transcript=json.dumps(request.transcript)
+    )
+    result = call_groq(prompt, json_mode=True)
+    try:
+        start = result.find('{')
+        end = result.rfind('}') + 1
+        return json.loads(result[start:end])
+    except:
+        return {
+            "communicationScore": 75,
+            "technicalScore": 75,
+            "confidenceScore": 75,
+            "problemSolvingScore": 75,
+            "summary": "Interview concluded.",
+            "strengths": ["Communication"],
+            "weaknesses": [],
+            "recommendations": ["Keep practicing"],
+            "verdict": "CONSIDER"
+        }
 @router.post('/review')
 async def review_code(request: CodeReviewRequest):
     prompt = CODE_INTELLIGENCE_PROMPT.format(
         language=request.language,
         problemDescription=request.problemDescription,
         code=request.code,
-        staticAnalysis=json.dumps(request.staticAnalysis) if request.staticAnalysis else "None detected"
+        staticAnalysis=json.dumps(request.staticAnalysis) if request.staticAnalysis else "None detected",
+        executionStatus=request.executionStatus or "Unknown",
+        executionResults=json.dumps(request.executionResults) if request.executionResults else "None"
     )
     result = call_groq(prompt, json_mode=True)
     return {'review': result}
@@ -357,11 +533,20 @@ async def dashboard_recommendations(request: dict):
         {{
             "summary": "1-2 sentence improvement plan",
             "recommendations": [
-                {{ "title": "topic name", "description": "why and what", "action": "/room", "priority": "High" }}
+                {{ "title": "Actionable task title", "description": "why and what", "action": "/valid_route", "priority": "High" }}
             ],
             "aiInsights": "Deep analysis of their performance trends",
             "memoryPattern": "A summary of how they have improved or what they repeatedly struggle with"
         }}
+
+        IMPORTANT RULES FOR "action":
+        You MUST choose ONE of these EXACT routes for the "action" field depending on the task:
+        - "/interview" (for practicing mock interviews, communication, or system design)
+        - "/coding" (for practicing algorithms, data structures, and problem solving)
+        - "/resume" (for updating resume or career details)
+        - "/analytics" (to view detailed performance metrics)
+        - "/career" (to review career roadmap)
+        DO NOT invent new URLs. Always map the recommendation to the most relevant exact route above.
 
         Current Stats: {json.dumps(stats)}
         Recent Activity: {json.dumps(activity)}
@@ -372,16 +557,21 @@ async def dashboard_recommendations(request: dict):
             start = result.find('{')
             end = result.rfind('}') + 1
             return json.loads(result[start:end])
-        except:
-            return {
-                "summary": "Focus on consistent technical practice.",
-                "recommendations": [],
-                "aiInsights": result,
-                "memoryPattern": "Analyzing patterns..."
-            }
+        except Exception as e:
+            print(f"Recs Parse Error: {e}")
+            raise Exception("Parse failed")
+            
     except Exception as e:
-        print(f"Recs Error: {e}")
-        return {"summary": "Keep practicing.", "recommendations": [], "aiInsights": "", "memoryPattern": ""}
+        print(f"Recs Error (returning fallback): {e}")
+        return {
+            "summary": "Continue building your foundational skills. AI analysis is currently calibrating your recent activity.",
+            "recommendations": [
+                { "title": "Complete Calibration", "description": "Take another interview to establish a stronger baseline.", "action": "/interview", "priority": "High" },
+                { "title": "Solve Code Challenges", "description": "Improve your technical readiness with targeted practice.", "action": "/coding", "priority": "Medium" }
+            ],
+            "aiInsights": "Based on recent activity, the candidate is establishing their foundation. Maintain consistency to unlock deeper insights.",
+            "memoryPattern": "Candidate is currently in the active learning and data collection phase."
+        }
 
 @router.post('/interview/summary')
 async def interview_summary(request: dict):
@@ -412,18 +602,13 @@ async def interview_summary(request: dict):
             if start != -1 and end != 0:
                 return json.loads(result[start:end])
             return {"summary": result, "strengths": [], "weaknesses": [], "recommendations": [], "verdict": "CONSIDER"}
-        except:
-            return {"summary": result, "strengths": [], "weaknesses": [], "recommendations": [], "verdict": "CONSIDER"}
+        except Exception as e:
+            print(f"Summary JSON Parse Error: {e}")
+            raise HTTPException(status_code=500, detail="Failed to parse summary JSON")
 
     except Exception as e:
         print(f"Summary Error: {e}")
-        return {
-            "summary": "Interview session concluded successfully.",
-            "strengths": ["Communication", "Engagement"],
-            "weaknesses": ["Precision"],
-            "recommendations": ["Further deep-dives"],
-            "verdict": "CONSIDER"
-        }
+        raise HTTPException(status_code=500, detail="Failed to generate interview summary")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CAREER AI INTELLIGENCE — Phase 3 Endpoints
@@ -436,6 +621,7 @@ async def career_profile_init(request: CareerProfileInitRequest):
         prompt = CAREER_PROFILE_INIT_PROMPT.format(
             targetRole=request.targetRole,
             targetCompany=request.targetCompany or 'top tech company',
+            timeline=request.timeline,
             currentYear=request.currentYear,
             dsaComfort=request.dsaComfort,
             systemDesignComfort=request.systemDesignComfort,
@@ -443,6 +629,7 @@ async def career_profile_init(request: CareerProfileInitRequest):
             weakTopics=', '.join(request.weakTopics) or 'None specified',
             strongTopics=', '.join(request.strongTopics) or 'None specified',
             persona=request.persona,
+            targetWeekCount=request.targetWeekCount,
         )
         result = call_groq(prompt, json_mode=True)
         try:
@@ -473,10 +660,10 @@ async def adaptive_roadmap(request: AdaptiveRoadmapRequest):
             persona=request.persona,
             startingFromWeek=request.startingFromWeek,
             readinessScore=request.readinessScore,
-            performanceDelta=request.performanceDelta,
+            performanceDelta=json.dumps(request.performanceDelta).replace("{", "{{").replace("}", "}}"),
             strugglingTopics=', '.join(request.strugglingTopics) or 'None',
             strongTopics=', '.join(request.strongTopics) or 'None',
-            currentWeeks=json.dumps(request.currentWeeks),
+            currentWeeks=json.dumps(request.currentWeeks).replace("{", "{{").replace("}", "}}"),
         )
         result = call_groq(prompt, json_mode=True)
         try:
@@ -490,10 +677,10 @@ async def adaptive_roadmap(request: AdaptiveRoadmapRequest):
                 raise ValueError("No JSON object found")
         except Exception as parse_err:
             print(f"Adaptive roadmap parse error: {parse_err}")
-            return {'result': {'weeklyPlan': []}}
+            raise HTTPException(status_code=500, detail="Failed to parse adaptive roadmap JSON")
     except Exception as e:
         print(f"Adaptive roadmap error: {e}")
-        return {'result': {'weeklyPlan': []}}
+        raise HTTPException(status_code=500, detail="Failed to generate adaptive roadmap")
 
 
 @router.post('/career/mentor/v2')
@@ -534,16 +721,17 @@ async def career_mentor_v2(request: MentorV2Request):
             return {'mentorResponse': parsed}
         except Exception as parse_err:
             print(f"Mentor v2 parse error: {parse_err}")
-            return {'mentorResponse': {'reply': result.strip(), 'actionableTips': [], 'suggestedNextSteps': [], 'referencesToPastSession': None}}
+            raise HTTPException(status_code=500, detail="Failed to parse mentor response JSON")
     except Exception as e:
         print(f"Mentor v2 error: {e}")
-        return {'mentorResponse': {'reply': 'I encountered an error. Please try again.', 'actionableTips': [], 'suggestedNextSteps': [], 'referencesToPastSession': None}}
+        raise HTTPException(status_code=500, detail="Mentor AI service failed")
 
 class TodayEngineRequest(BaseModel):
-    targetRole: str
-    strugglingTopics: list[str]
-    currentRoadmapWeek: dict | None
-    availableMinutes: int
+    targetRole: str = 'Software Engineer'
+    strugglingTopics: list[str] = []
+    currentRoadmapWeek: dict | None = None
+    roadmapSpecificProblems: list[str] = []
+    availableMinutes: int = 120
 
 @router.post("/career/today/generate")
 async def generate_today_focus(request: TodayEngineRequest):
@@ -551,7 +739,8 @@ async def generate_today_focus(request: TodayEngineRequest):
         prompt = TODAY_ENGINE_PROMPT.format(
             targetRole=request.targetRole,
             strugglingTopics=', '.join(request.strugglingTopics) if request.strugglingTopics else 'None',
-            currentRoadmapWeek=json.dumps(request.currentRoadmapWeek) if request.currentRoadmapWeek else 'None',
+            currentRoadmapWeek=json.dumps(request.currentRoadmapWeek).replace("{", "{{").replace("}", "}}") if request.currentRoadmapWeek else 'None',
+            roadmapSpecificProblems=', '.join(request.roadmapSpecificProblems) if request.roadmapSpecificProblems else 'None',
             availableMinutes=request.availableMinutes
         )
 
@@ -559,4 +748,4 @@ async def generate_today_focus(request: TodayEngineRequest):
         return {"result": result}
     except Exception as e:
         print(f"Today Engine error: {e}")
-        return {"result": {"tasks": []}}
+        raise HTTPException(status_code=500, detail="Failed to generate today focus")

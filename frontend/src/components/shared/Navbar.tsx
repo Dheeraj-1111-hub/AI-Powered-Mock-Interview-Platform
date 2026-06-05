@@ -1,8 +1,8 @@
 import { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Command, Menu, X, LogOut, User as UserIcon, ChevronDown, Sparkles, Bell } from 'lucide-react';
-import { cn } from '../../utils/cn';
+import { Command, List, X, SignOut, User, CaretDown, Sparkle, Bell } from '@phosphor-icons/react';
+import { cn } from '../../utils';
 import { AuthContext } from '../../services/auth.service';
 import { fetchActivityFeed } from '../../services/api.service';
 
@@ -13,7 +13,7 @@ export function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -45,6 +45,7 @@ export function Navbar() {
   const navLinks = user ? [
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Career OS', path: '/career' },
+    { name: 'Resume', path: '/resume' },
     { name: 'Coding Lab', path: '/coding' },
     { name: 'Interviews', path: '/interview' },
     { name: 'Analytics', path: '/analytics' },
@@ -58,131 +59,133 @@ export function Navbar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[100] flex justify-center mt-4 md:mt-6 px-4 pointer-events-none">
-        <motion.div
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className={cn(
-            'pointer-events-auto flex items-center justify-between rounded-[2rem] border transition-all duration-500 w-full max-w-5xl px-4 py-2.5',
-            scrolled 
-              ? 'border-white/10 bg-slate-950/70 shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] backdrop-blur-2xl'
-              : 'border-white/5 bg-slate-950/30 backdrop-blur-xl'
-          )}
-        >
+      {/* ACETERNITY FLOATING NAVBAR */}
+      <motion.header 
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 100, damping: 20 }}
+        className={cn(
+          'fixed inset-x-0 top-6 z-[100] transition-all duration-500 mx-auto w-[95%] max-w-[1200px]',
+        )}
+      >
+        <div className="h-14 px-3 flex items-center justify-between bg-[#030303]/70 backdrop-blur-xl border border-white/[0.08] rounded-full shadow-[0_0_15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.05)]">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 pl-2 group relative z-20">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all">
-              <span className="font-heading font-black text-white text-sm">IQ</span>
-              <div className="absolute inset-0 rounded-xl ring-1 ring-white/30" />
+          <Link to="/" className="flex items-center gap-3 group relative z-20 pl-2">
+            <div className="flex h-9 w-9 items-center justify-center relative transition-transform group-hover:scale-105">
+              <div className="absolute inset-0 bg-indigo-500/20 rounded-xl blur-md group-hover:bg-indigo-500/40 transition-colors" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]">
+                <path d="M12.9868 2.0003L4.48682 12.0003H11.9868L10.9868 21.0003L20.4868 9.5003H12.9868L12.9868 2.0003Z" fill="url(#sparkGradientNav)" stroke="url(#sparkStrokeNav)" strokeWidth="1.5" strokeLinejoin="round"/>
+                <defs>
+                  <linearGradient id="sparkGradientNav" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#ffffff" />
+                    <stop offset="1" stopColor="#a3a3a3" />
+                  </linearGradient>
+                  <linearGradient id="sparkStrokeNav" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#ffffff" />
+                    <stop offset="1" stopColor="#525252" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
-            <span className="font-heading text-lg font-black tracking-tight text-white/90 group-hover:text-white transition-colors hidden sm:block">
+            <span className="font-heading text-sm font-bold tracking-tight text-white hidden sm:block">
               HireIQ
             </span>
           </Link>
 
-          {/* Desktop Nav - The Aceternity Floating Pills */}
-          <nav className="hidden md:flex items-center justify-center relative z-20" onMouseLeave={() => setHoveredIndex(null)}>
-            {navLinks.map((link, idx) => {
+          {/* Desktop Nav with Aceternity Hover Animations */}
+          <nav className="hidden md:flex items-center justify-center gap-1 relative z-20">
+            {navLinks.map((link) => {
               const isActive = location.pathname === link.path;
               return (
                 <Link
                   key={link.name}
                   to={link.path}
-                  onClick={(e) => {
-                    if (link.path.startsWith('/#')) {
-                      if (location.pathname === '/') {
-                        e.preventDefault();
-                        const id = link.path.split('#')[1];
-                        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }
-                  }}
-                  onMouseEnter={() => setHoveredIndex(idx)}
-                  className="relative px-5 py-2 text-xs font-black uppercase tracking-widest transition-colors rounded-full"
+                  onMouseEnter={() => setHoveredIndex(link.name)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={cn(
+                    "relative px-4 py-2 text-xs font-semibold transition-colors rounded-full z-10",
+                    isActive ? "text-white" : "text-slate-400 hover:text-white"
+                  )}
                 >
-                  <AnimatePresence>
-                    {hoveredIndex === idx && (
-                      <motion.span
-                        className="absolute inset-0 rounded-full bg-white/10 -z-10"
-                        layoutId="hoverBackground"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1, transition: { duration: 0.15 } }}
-                        exit={{ opacity: 0, transition: { duration: 0.15, delay: 0.2 } }}
-                      />
-                    )}
-                  </AnimatePresence>
-                  <span className={cn(
-                    "relative z-10 transition-colors duration-300",
-                    isActive ? "text-white" : hoveredIndex === idx ? "text-white" : "text-slate-400"
-                  )}>
-                    {link.name}
-                  </span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeIndicator"
-                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]"
-                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  {/* Aceternity Hover Pill */}
+                  {hoveredIndex === link.name && !isActive && (
+                    <motion.span
+                      layoutId="nav-hover"
+                      className="absolute inset-0 bg-white/[0.04] rounded-full -z-10"
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
                     />
                   )}
+                  {/* Aceternity Active Pill */}
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-active"
+                      className="absolute inset-0 bg-white/[0.08] border border-white/[0.05] rounded-full -z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    />
+                  )}
+                  {link.name}
                 </Link>
               );
             })}
           </nav>
 
           {/* Right Section */}
-          <div className="flex items-center gap-3 relative z-20">
+          <div className="flex items-center gap-2 relative z-20 pr-1">
             <button
-              className="hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-white/10 hover:text-white hover:border-white/20 group"
+              className="hidden md:flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#0A0A0A] px-3 py-1.5 text-xs font-medium text-slate-400 transition-all hover:bg-white/[0.04] hover:text-white group shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)]"
               onClick={() => {
                 const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
                 document.dispatchEvent(event);
               }}
             >
-              <Command className="h-3 w-3 group-hover:text-indigo-400 transition-colors" />
-              <span>Cmd K</span>
+              <Command size={14} className="group-hover:text-white transition-colors" />
+              <span>Search</span>
+              <span className="px-1.5 py-0.5 rounded flex items-center justify-center bg-[#1A1A1A] border border-white/[0.08] text-[9px] text-slate-300 font-mono shadow-sm">⌘K</span>
             </button>
             
-            <div className="flex items-center pl-2">
+            <div className="flex items-center pl-1">
               {user ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <div className="relative">
                     <button 
                       onClick={() => { setNotificationsOpen(!notificationsOpen); setUserMenuOpen(false); }}
-                      className="relative p-2 rounded-full hover:bg-white/10 transition-all group"
+                      className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-all group"
                     >
-                      <Bell className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+                      <Bell size={18} weight={notificationsOpen ? "fill" : "regular"} className={cn("transition-colors", notificationsOpen ? "text-white" : "text-slate-400 group-hover:text-white")} />
                       {notifications.length > 0 && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.8)] border border-slate-950"></span>
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] border border-[#0a0a0a]"></span>
                       )}
                     </button>
 
                     <AnimatePresence>
                       {notificationsOpen && (
                         <motion.div 
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          initial={{ opacity: 0, y: 15, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          exit={{ opacity: 0, y: 15, scale: 0.95 }}
                           transition={{ type: "spring", bounce: 0.3, duration: 0.4 }}
-                          className="absolute right-0 mt-4 w-72 rounded-3xl bg-slate-900/90 border border-white/10 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.5)] backdrop-blur-3xl overflow-hidden origin-top-right z-50"
+                          className="absolute right-0 mt-4 w-80 rounded-3xl bg-slate-900/90 border border-white/10 p-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)] backdrop-blur-3xl overflow-hidden origin-top-right z-50"
                         >
                           <div className="px-4 py-3 border-b border-white/5 mb-2 flex justify-between items-center">
                              <p className="text-xs font-black text-white uppercase tracking-wider">Notifications</p>
-                             <span className="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">{notifications.length} New</span>
+                             <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">{notifications.length} New</span>
                           </div>
-                          <div className="max-h-[300px] overflow-y-auto custom-scrollbar px-1">
+                          <div className="max-h-[350px] overflow-y-auto custom-scrollbar px-1">
                             {notifications.length === 0 ? (
-                              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest text-center py-4">All caught up</p>
+                              <div className="py-8 flex flex-col items-center justify-center opacity-50">
+                                 <Bell size={32} weight="thin" className="mb-2" />
+                                 <p className="text-[10px] font-mono text-white uppercase tracking-widest text-center">All caught up</p>
+                              </div>
                             ) : (
                               notifications.map((notif: any, i: number) => (
-                                <div key={i} className="mb-1 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
-                                  <p className="text-[10px] font-black text-white uppercase tracking-wider mb-1 flex items-center justify-between">
+                                <div key={i} className="mb-1 p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-colors cursor-default group">
+                                  <p className="text-xs font-bold text-white mb-1 flex items-center justify-between group-hover:text-indigo-300 transition-colors">
                                     {notif.title}
                                     {notif.metadata?.xpEarned > 0 && (
-                                      <span className="text-emerald-400">+{notif.metadata.xpEarned} XP</span>
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">+{notif.metadata.xpEarned} XP</span>
                                     )}
                                   </p>
-                                  <p className="text-[10px] text-slate-400 leading-relaxed">{notif.description}</p>
+                                  <p className="text-[11px] text-slate-400 leading-relaxed">{notif.description}</p>
                                 </div>
                               ))
                             )}
@@ -195,42 +198,44 @@ export function Navbar() {
                   <div className="relative">
                     <button 
                       onClick={() => { setUserMenuOpen(!userMenuOpen); setNotificationsOpen(false); }}
-                    className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-all border border-transparent hover:border-white/10 group"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center group-hover:bg-indigo-500/40 transition-colors overflow-hidden relative">
-                       <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                       <UserIcon className="w-4 h-4 text-indigo-300 group-hover:text-white relative z-10" />
+                      className={cn(
+                        "flex items-center gap-2 pl-1 pr-3 py-1 rounded-full transition-all border group ml-1",
+                        userMenuOpen ? "bg-white/10 border-white/20" : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/10"
+                      )}
+                    >
+                    <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center overflow-hidden border border-white/[0.08] group-hover:border-white/20 transition-colors shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+                       <User size={14} weight="bold" className="text-slate-300 group-hover:text-white" />
                     </div>
-                    <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform hidden sm:block group-hover:text-white", userMenuOpen && "rotate-180")} />
+                    <CaretDown size={12} weight="bold" className={cn("text-slate-400 transition-transform hidden sm:block group-hover:text-white", userMenuOpen && "rotate-180")} />
                   </button>
 
                   <AnimatePresence>
                     {userMenuOpen && (
                       <motion.div 
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        exit={{ opacity: 0, y: 15, scale: 0.95 }}
                         transition={{ type: "spring", bounce: 0.3, duration: 0.4 }}
-                        className="absolute right-0 mt-4 w-56 rounded-3xl bg-slate-900/90 border border-white/10 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.5)] backdrop-blur-3xl overflow-hidden origin-top-right"
+                        className="absolute right-0 mt-4 w-64 rounded-3xl bg-slate-900/90 border border-white/10 p-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)] backdrop-blur-3xl overflow-hidden origin-top-right z-50"
                       >
-                          <div className="px-4 py-3 border-b border-white/5 mb-2">
-                             <p className="text-xs font-black text-white uppercase tracking-wider truncate">{user.name}</p>
-                             <p className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest mt-0.5">Active Session</p>
+                          <div className="px-4 py-4 border-b border-white/5 mb-2 bg-white/[0.02] rounded-2xl m-1">
+                             <p className="text-sm font-black text-white truncate">{user.name}</p>
+                             <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase tracking-widest truncate">{user.email || 'User'}</p>
                           </div>
                           
                           <Link
                            to="/profile"
-                           className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest text-slate-300 hover:bg-white/5 hover:text-white transition-colors mb-1 group"
+                           className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors mb-1 group"
                            onClick={() => setUserMenuOpen(false)}
                          >
-                            <Sparkles className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                            <Sparkle size={16} weight="fill" className="text-indigo-400 group-hover:scale-110 transition-transform" />
                             DNA Profile
                          </Link>
                          <button 
                            onClick={handleLogout}
-                           className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-400 transition-colors group"
+                           className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-400 transition-colors group mt-1"
                          >
-                            <LogOut className="w-4 h-4 text-rose-500/50 group-hover:text-rose-400 transition-colors" />
+                            <SignOut size={16} weight="bold" className="group-hover:scale-110 transition-transform" />
                             Disconnect
                          </button>
                       </motion.div>
@@ -240,15 +245,14 @@ export function Navbar() {
                </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Link to="/auth" className="hidden sm:block px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">
+                  <Link to="/auth" className="hidden sm:block px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
                     Log in
                   </Link>
                   <Link
                     to="/auth"
-                    className="relative group rounded-full bg-white px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-950 transition-all hover:scale-105 active:scale-95 overflow-hidden"
+                    className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition-all hover:bg-slate-200"
                   >
-                    <span className="relative z-10">Sign up</span>
-                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover:animate-[shimmer_1.5s_infinite] z-0" />
+                    Sign up
                   </Link>
                 </div>
               )}
@@ -256,14 +260,17 @@ export function Navbar() {
 
             {/* Mobile Menu Toggle */}
             <button 
-              className="md:hidden text-slate-300 hover:text-white p-2"
+              className="md:hidden text-slate-300 hover:text-white w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 ml-1"
               onClick={() => setMobileMenuOpen(true)}
             >
-              <Menu className="h-5 w-5" />
+              <List size={18} weight="bold" />
             </button>
           </div>
-        </motion.div>
-      </header>
+        </div>
+      </motion.header>
+
+      {/* Spacer to push content down since header is floating now */}
+      <div className="h-12" />
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -273,7 +280,7 @@ export function Navbar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[110] bg-slate-950/80 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm md:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
@@ -281,60 +288,80 @@ export function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="fixed inset-y-0 right-0 z-[120] w-full max-w-sm border-l border-white/10 bg-slate-950 px-6 py-6 md:hidden flex flex-col"
+              className="fixed inset-y-0 right-0 z-[120] w-full max-w-sm border-l border-white/10 bg-[#0a0a0a] px-6 py-6 md:hidden flex flex-col shadow-2xl"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-10">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_20px_rgba(99,102,241,0.3)]">
-                    <span className="font-heading font-black text-white text-sm">IQ</span>
+                  <div className="flex h-10 w-10 items-center justify-center relative">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-10 drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                      <path d="M12.9868 2.0003L4.48682 12.0003H11.9868L10.9868 21.0003L20.4868 9.5003H12.9868L12.9868 2.0003Z" fill="url(#sparkGradientMob)" stroke="url(#sparkStrokeMob)" strokeWidth="1.5" strokeLinejoin="round"/>
+                      <defs>
+                        <linearGradient id="sparkGradientMob" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#ffffff" />
+                          <stop offset="1" stopColor="#a3a3a3" />
+                        </linearGradient>
+                        <linearGradient id="sparkStrokeMob" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#ffffff" />
+                          <stop offset="1" stopColor="#525252" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
                   </div>
                   <span className="font-heading text-xl font-black text-white tracking-tight">HireIQ</span>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-white transition-colors bg-white/5"
+                  className="rounded-full w-10 h-10 flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-colors bg-white/5"
                 >
-                  <X className="h-5 w-5" />
+                  <X size={20} weight="bold" />
                 </button>
               </div>
               <div className="flex flex-col gap-2 flex-1">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.name}
-                    to={link.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="px-4 py-4 rounded-2xl bg-white/[0.02] border border-white/5 text-sm font-black uppercase tracking-widest text-slate-300 hover:bg-white/10 hover:text-white transition-all active:scale-95"
-                  >
-                    {link.name}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                   const isActive = location.pathname === link.path;
+                   return (
+                     <Link
+                       key={link.name}
+                       to={link.path}
+                       onClick={() => setMobileMenuOpen(false)}
+                       className={cn(
+                         "px-5 py-4 rounded-2xl border text-sm font-black transition-all",
+                         isActive 
+                           ? "bg-white/[0.08] border-white/[0.05] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+                           : "bg-transparent border-transparent text-slate-400 hover:bg-white/[0.04] hover:border-white/[0.05] hover:text-white"
+                       )}
+                     >
+                       {link.name}
+                     </Link>
+                   )
+                })}
               </div>
               
               <div className="mt-auto pt-8 border-t border-white/10">
                 {user ? (
                   <>
-                    <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/10 mb-4">
-                       <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                          <UserIcon className="w-6 h-6 text-indigo-400" />
+                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 mb-4">
+                       <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center border border-white/10">
+                          <User size={24} className="text-slate-400" />
                        </div>
                        <div>
-                          <p className="text-xs font-black text-white uppercase tracking-wider">{user.name}</p>
-                          <p className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest mt-1">Active Session</p>
+                          <p className="text-sm font-black text-white">{user.name}</p>
+                          <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase tracking-widest">{user.email || 'User'}</p>
                        </div>
                     </div>
                     <Link
                        to="/profile"
                        onClick={() => setMobileMenuOpen(false)}
-                       className="flex w-full items-center justify-center gap-3 rounded-2xl bg-white/[0.05] border border-white/10 px-4 py-4 text-xs font-black uppercase tracking-widest text-white shadow-sm transition-all mb-3 active:scale-95"
+                       className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black text-black transition-all hover:bg-slate-200 mb-3 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                      >
-                       <Sparkles className="w-4 h-4 text-indigo-400" />
+                       <Sparkle size={16} weight="fill" />
                        DNA Profile
                      </Link>
                     <button
                       onClick={handleLogout}
-                      className="flex w-full items-center justify-center gap-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 px-4 py-4 text-xs font-black uppercase tracking-widest text-rose-400 shadow-sm transition-all active:scale-95"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.02] border border-white/10 px-4 py-4 text-sm font-bold text-rose-400 hover:bg-rose-500/10 transition-all"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <SignOut size={16} weight="bold" />
                       Disconnect
                     </button>
                   </>
@@ -343,16 +370,16 @@ export function Navbar() {
                     <Link
                       to="/auth"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="inline-flex w-full justify-center rounded-2xl bg-white/[0.05] border border-white/10 px-4 py-4 text-xs font-black uppercase tracking-widest text-white shadow-sm active:scale-95 transition-transform"
+                      className="flex w-full items-center justify-center rounded-2xl bg-white/[0.05] border border-white/10 px-4 py-4 text-sm font-bold text-white"
                     >
                       Log in
                     </Link>
                     <Link
                       to="/auth"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="inline-flex w-full justify-center rounded-2xl bg-white px-4 py-4 text-xs font-black uppercase tracking-widest text-slate-950 shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95 transition-transform"
+                      className="flex w-full items-center justify-center rounded-2xl bg-white px-4 py-4 text-sm font-black text-black"
                     >
-                      Initialize Account
+                      Sign up
                     </Link>
                   </div>
                 )}

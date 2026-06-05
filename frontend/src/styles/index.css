@@ -6,33 +6,40 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
+    --background: 0 0% 4%; /* #0a0a0a */
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 0 0% 7%; /* #111 */
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 3.7% 15.9%;
+    --primary: 0 0% 98%; /* White buttons */
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 10%; /* #1a1a1a */
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
+    --muted: 0 0% 15%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --accent: 0 0% 15%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 263.4 70% 50.4%;
-    --radius: 1rem;
+    --border: 0 0% 14%; /* border-white/10 equivalent approx */
+    --input: 0 0% 14%;
+    --ring: 0 0% 98%;
+    --radius: 0.5rem; /* New York style uses smaller radius */
   }
 }
 
-body {
-  @apply bg-slate-950 text-white antialiased;
-  font-family: 'Inter', sans-serif;
-  overflow-x: hidden;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    @apply antialiased;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

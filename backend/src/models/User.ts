@@ -2,7 +2,10 @@ import { Schema, model, Document } from 'mongoose';
 
 export interface ICareerProfile {
   targetRole: string;
-  targetCompany: string;
+  dreamCompany: string;
+  backupCompany: string;
+  timeline: string;
+  targetCompany: string; // Legacy
   currentYear: string; // 'freshman' | 'sophomore' | 'junior' | 'senior' | 'professional'
   dailyHoursAvailable: number;
   weakTopics: string[];
@@ -47,30 +50,24 @@ export interface IUser extends Document {
   onboardingCompleted: boolean;
   resumeUrl?: string;
   resumeAnalyzed: boolean;
-  xp: number;
-  streak: number;
   lastActiveDate?: Date;
   solvedProblems: string[];
-  topicMastery: Map<string, number>;
   // Career Intelligence (Legacy & New)
   careerProfile: ICareerProfile; // Legacy, kept for graceful migration
   careerStrategies: IStrategy[];
   activeStrategyId?: string;
   
   careerState: string; // 'Explorer' | 'Builder' | 'Interview Ready' | 'FAANG Ready' | 'Elite Candidate'
-  interviewReadinessScore: number; // 0-100, cached from ReadinessEngine
   readinessLastComputed?: Date;
-  
   aiReflection?: string;
-  behavioralTelemetry?: {
-    hintDependency: 'Low' | 'Medium' | 'High';
-    recoveryAbility: 'Low' | 'Medium' | 'High';
-    persistence: 'Low' | 'Medium' | 'High';
-    panicSignals: string;
-    interviewStability: 'Low' | 'Medium' | 'High';
-    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
-    evidenceCount: number;
-  };
+
+  trophies: Array<{
+    id: string;
+    title: string;
+    description: string;
+    unlockedAt: Date;
+    evidence: string;
+  }>;
 
   dailyFocus?: {
     date: Date;
@@ -81,12 +78,16 @@ export interface IUser extends Document {
       type: 'solve' | 'interview' | 'learn' | 'review';
       estMinutes: number;
       metadata?: any;
+      link?: string;
     }>;
   };
 }
 
 const careerProfileSchema = new Schema<ICareerProfile>({
   targetRole: { type: String, default: 'Software Engineer' },
+  dreamCompany: { type: String, default: '' },
+  backupCompany: { type: String, default: '' },
+  timeline: { type: String, default: '12 months' },
   targetCompany: { type: String, default: '' },
   currentYear: { type: String, default: 'junior' },
   dailyHoursAvailable: { type: Number, default: 2 },
@@ -130,29 +131,24 @@ const userSchema = new Schema<IUser>({
   onboardingCompleted: { type: Boolean, default: false },
   resumeUrl: String,
   resumeAnalyzed: { type: Boolean, default: false },
-  xp: { type: Number, default: 0 },
-  streak: { type: Number, default: 0 },
   lastActiveDate: Date,
   solvedProblems: [{ type: Schema.Types.ObjectId, ref: 'CodingProblem' }],
-  topicMastery: { type: Map, of: Number, default: {} },
   // Career Intelligence
   careerProfile: { type: careerProfileSchema, default: () => ({}) },
   careerStrategies: { type: [strategySchema], default: [] },
   activeStrategyId: { type: String },
   careerState: { type: String, default: 'Explorer' },
-  interviewReadinessScore: { type: Number, default: 0 },
   readinessLastComputed: Date,
   
   aiReflection: { type: String },
-  behavioralTelemetry: {
-    hintDependency: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
-    recoveryAbility: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
-    persistence: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
-    panicSignals: { type: String, default: 'Execution speed drops under timers' },
-    interviewStability: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
-    confidence: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
-    evidenceCount: { type: Number, default: 0 },
-  },
+
+  trophies: [{
+    id: String,
+    title: String,
+    description: String,
+    unlockedAt: { type: Date, default: Date.now },
+    evidence: String
+  }],
 
   dailyFocus: {
     date: Date,
@@ -163,6 +159,7 @@ const userSchema = new Schema<IUser>({
       type: { type: String, enum: ['solve', 'interview', 'learn', 'review'], default: 'solve' },
       estMinutes: Number,
       metadata: Schema.Types.Mixed,
+      link: String
     }],
   },
 });

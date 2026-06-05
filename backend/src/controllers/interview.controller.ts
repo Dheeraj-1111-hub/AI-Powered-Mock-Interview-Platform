@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Interview from '../models/Interview';
+import ActivityLog from '../models/ActivityLog';
 import { reqUser } from '../middleware/auth';
 import axios from 'axios';
 
@@ -36,14 +37,20 @@ export const startInterview = async (req: Request, res: Response) => {
       ? JSON.parse(aiResponse.data.plan) 
       : aiResponse.data.plan;
 
+    let finalPlan = plan;
+    if (plan.error || !plan.rounds) {
+      console.error("AI Service returned an error generating plan:", plan.error);
+      throw new Error("Failed to generate AI interview plan from service");
+    }
+
     const interview = new Interview({
       user: userId,
       role,
       experience,
       stack,
       companyType,
-      persona: plan.persona,
-      rounds: plan.rounds.map((round: any) => ({
+      persona: finalPlan.persona,
+      rounds: finalPlan.rounds.map((round: any) => ({
         ...round,
         questions: round.questions.map((q: any) => ({
           text: q.text,
@@ -64,7 +71,7 @@ export const startInterview = async (req: Request, res: Response) => {
 
 export const submitAnswer = async (req: Request, res: Response) => {
   try {
-    const { interviewId, answer } = req.body;
+    const { interviewId, answer, latencyMs, voiceMetrics } = req.body;
     const roundIndex = Number(req.body.roundIndex);
     const questionIndex = Number(req.body.questionIndex);
 
@@ -93,6 +100,8 @@ export const submitAnswer = async (req: Request, res: Response) => {
           answer,
           role: interview.role,
           transcript, // Added global context memory
+          latencyMs,
+          voiceMetrics,
           roundType: interview.rounds[roundIndex].name.toLowerCase().includes('technical') ? 'technical' : 'behavioral'
         });
 
@@ -100,9 +109,16 @@ export const submitAnswer = async (req: Request, res: Response) => {
           ? JSON.parse(aiResponse.data.evaluation)
           : aiResponse.data.evaluation;
 
+        let finalEvaluation = evaluation;
+        if (evaluation.error || typeof evaluation.accuracy !== 'number') {
+            console.error("AI Service returned an error for evaluation:", evaluation.error);
+            throw new Error("Failed to generate AI evaluation from service");
+        }
+
         // Update question status and evaluation
         question.answer = answer;
-        question.evaluation = evaluation;
+        question.evaluation = finalEvaluation;
+        question.latencyMs = latencyMs;
         question.status = 'answered';
 
         // PHASE 7: AUTO-FOLLOW UP INJECTION
@@ -114,6 +130,7 @@ export const submitAnswer = async (req: Request, res: Response) => {
                  roundName: interview.rounds[roundIndex].name,
                  prevQuestion: question.text,
                  prevAnswer: answer,
+                 transcript,
                  persona: interview.persona?.name || 'Skeptical Senior Architect'
               });
               
@@ -153,8 +170,8 @@ export const endInterview = async (req: Request, res: Response) => {
     let count = 0;
     interview.rounds.forEach(round => {
       round.questions.forEach(q => {
-        if (q.evaluation && typeof q.evaluation.score === 'number') {
-          totalScore += q.evaluation.score;
+        if (q.evaluation && typeof q.evaluation.accuracy === 'number') {
+          totalScore += q.evaluation.accuracy;
           count++;
         }
       });
@@ -162,6 +179,20 @@ export const endInterview = async (req: Request, res: Response) => {
 
     interview.overallScore = count > 0 ? Math.round(totalScore / count) : 0;
     interview.status = 'completed';
+
+    // TRIGGER DATABASE TRUTH EVENT (ActivityLog)
+    try {
+      await ActivityLog.create({
+        user: interview.user,
+        type: 'interview_completed',
+        xpAwarded: interview.overallScore * 10,
+        metadata: {
+          interviewId: interview._id,
+          score: interview.overallScore,
+          difficulty: 'medium'
+        }
+      });
+    } catch(err) { console.error('ActivityLog creation failed:', err); }
 
     // TRIGGER GAMIFICATION
     let xpEarned = 0;
@@ -183,7 +214,7 @@ export const endInterview = async (req: Request, res: Response) => {
             r.questions.filter(q => q.status === 'answered').map(q => ({
                 question: q.text,
                 answer: q.answer,
-                score: q.evaluation?.score
+                accuracy: q.evaluation?.accuracy
             }))
         );
         
@@ -195,20 +226,62 @@ export const endInterview = async (req: Request, res: Response) => {
             interview.report = aiResponse.data;
             interview.feedback = aiResponse.data.summary;
             interview.tags = aiResponse.data.strengths; // Use strengths as tags
+            
+            // PHASE 10: CAREER OS INTEGRATION - ROADMAP INJECTION
+            if (aiResponse.data.weaknesses && aiResponse.data.weaknesses.length > 0) {
+               try {
+                   const { default: Roadmap } = await import('../models/Roadmap');
+                   const activeRoadmap = await Roadmap.findOne({ user: interview.user }).sort({ createdAt: -1 });
+                   if (activeRoadmap) {
+                       // Add to struggling topics
+                       aiResponse.data.weaknesses.forEach((weakness: string) => {
+                           if (!activeRoadmap.adaptiveSignals.strugglingTopics.includes(weakness)) {
+                               activeRoadmap.adaptiveSignals.strugglingTopics.push(weakness);
+                           }
+                       });
+                       
+                       // Force inject tasks into the active week
+                       const activeWeekIndex = activeRoadmap.weeklyPlan.findIndex(w => w.status === 'active');
+                       if (activeWeekIndex !== -1) {
+                           activeRoadmap.weeklyPlan[activeWeekIndex].topics.push(...aiResponse.data.weaknesses);
+                           
+                           // Add explicit review tasks
+                           aiResponse.data.weaknesses.forEach((weakness: string) => {
+                               activeRoadmap.weeklyPlan[activeWeekIndex].tasks.push({
+                                   id: `review_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                                   title: `Review Weakness: ${weakness} (Identified in Mock Interview)`,
+                                   type: 'review',
+                                   completed: false,
+                                   xpReward: 20
+                               });
+                           });
+                       }
+                       await activeRoadmap.save();
+                       console.log(`[PHASE 10] Injected weaknesses into Roadmap for user ${interview.user}`);
+                   }
+               } catch (roadmapErr: any) {
+                   console.error('[PHASE 10] Roadmap Integration Failed:', roadmapErr.message);
+               }
+            }
         }
     } catch (aiErr: any) {
         console.error('[END INTERVIEW] AI Summary Error:', aiErr.message);
-        interview.feedback = "Interview session concluded successfully. Performance metrics have been synchronized.";
-        interview.report = {
-            summary: "Interview session concluded successfully.",
-            strengths: ["Communication"],
-            weaknesses: ["Technical Depth"],
-            recommendations: ["Review core concepts"],
-            verdict: "CONSIDER"
-        };
+        throw new Error("Failed to generate AI interview summary from service");
     }
     
     await interview.save();
+
+    // Phase 4: Cross-Feature Validation (Cache invalidation)
+    try {
+        const user = await User.findById(interview.user);
+        if (user) {
+            user.readinessLastComputed = null;
+            await user.save();
+        }
+    } catch (e) {
+        console.error('Failed to clear readiness cache:', e);
+    }
+
     console.log(`[END INTERVIEW] Successfully finalized session ${interviewId}`);
     
     const responsePayload = interview.toJSON();

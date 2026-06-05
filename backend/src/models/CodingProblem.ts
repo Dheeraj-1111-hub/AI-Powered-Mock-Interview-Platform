@@ -8,7 +8,7 @@ export interface ICodingProblem extends Document {
   description: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   category: string;
-  acceptanceRate?: number;
+  globalSuccessRate?: number; // Replaces acceptanceRate
   functionName: string;
   examples: Array<{
     input: string;
@@ -23,13 +23,22 @@ export interface ICodingProblem extends Document {
   }>;
   starterCode: Record<string, string>;
   constraints?: string[];
-  hints?: string[];
+  progressiveHints?: Array<{
+    type: 'conceptual' | 'structural' | 'pseudocode' | 'solution';
+    content: string;
+  }>;
   tags?: string[];
-  companyTags?: string[];
+  companies?: Array<{
+    name: string;
+    frequency: 'Low' | 'Medium' | 'High';
+    askCount: number;
+  }>;
   optimalComplexity?: string;
   relatedProblems?: string[];
   recommendedNext?: string;
   weaknessConnections?: string[];
+  editorial?: string;
+  solutionCode?: Record<string, string>;
   discussions?: Array<{
     author: string;
     timeAgo: string;
@@ -46,7 +55,7 @@ const codingProblemSchema = new Schema<ICodingProblem>({
   description: { type: String, required: true },
   difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], required: true },
   category: { type: String, required: true },
-  acceptanceRate: { type: Number },
+  globalSuccessRate: { type: Number },
   functionName: { type: String, required: true },
   examples: [{
     input: String,
@@ -61,10 +70,19 @@ const codingProblemSchema = new Schema<ICodingProblem>({
   }],
   starterCode: { type: Map, of: String },
   constraints: [String],
-  hints: [String],
+  progressiveHints: [{
+    type: { type: String, enum: ['conceptual', 'structural', 'pseudocode', 'solution'] },
+    content: String
+  }],
   tags: [String],
-  companyTags: [String],
-  optimalComplexity: { type: String, default: "O(N) Time, O(1) Space" },
+  companies: [{
+    name: String,
+    frequency: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Medium' },
+    askCount: { type: Number, default: 0 }
+  }],
+  optimalComplexity: { type: String },
+  editorial: { type: String },
+  solutionCode: { type: Map, of: String },
   relatedProblems: [String],
   recommendedNext: String,
   weaknessConnections: [String],

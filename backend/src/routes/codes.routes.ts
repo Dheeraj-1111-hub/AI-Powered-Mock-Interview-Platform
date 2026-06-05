@@ -16,6 +16,8 @@ router.get('/submissions', CodesController.getMySubmissions);
 router.get('/submissions/:id/audit-status', CodesController.getSubmissionAuditStatus);
 router.post('/interview/start', CodesController.startInterview);
 router.post('/interview/chat', CodesController.chatInterview);
+router.post('/interview/monitor', CodesController.monitorInterview);
 router.post('/interview/finish', CodesController.finishInterview);
+router.post('/problems/:id/discussions', CodesController.addDiscussion);
 
 export default router;

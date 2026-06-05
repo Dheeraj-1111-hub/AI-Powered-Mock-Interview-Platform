@@ -18,6 +18,7 @@ export interface IRoadmap extends Document {
     focus: string;
     topics: string[];
     problems: number;
+    specificProblems: string[];
     difficulty: 'Easy' | 'Medium' | 'Hard' | 'Mixed';
     mockInterviews: number;
     status: 'locked' | 'active' | 'completed' | 'struggling' | 'regenerated' | 'skipped';
@@ -66,12 +67,14 @@ const roadmapSchema = new Schema<IRoadmap>({
     focus: String,
     topics: [String],
     problems: Number,
+    specificProblems: [String],
     difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard', 'Mixed'], default: 'Easy' },
     mockInterviews: { type: Number, default: 0 },
     status: { type: String, enum: ['locked', 'active', 'completed', 'struggling', 'regenerated', 'skipped'], default: 'locked' },
     confidenceScore: Number,
     decisionReasoning: String,
     completedAt: Date,
+    dailyCompletions: { type: Number, default: 0 }, // counts days where all tasks done
     skippedTasks: [String],
     tasks: [{
       id: String,

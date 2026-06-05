@@ -11,6 +11,16 @@ interface DailyTask {
   completed: boolean;
   type: 'solve' | 'interview' | 'learn' | 'review';
   estMinutes: number;
+  link?: string;
+}
+
+interface WeekSync {
+  weekNumber: number;
+  weekFocus: string;
+  dailyCompletions: number;
+  daysToCompleteWeek: number;
+  totalProblemsThisWeek: number;
+  dailyQuota: number;
 }
 
 export default function TodayEngine({ onXPUpdate }: { onXPUpdate?: (xp: number) => void }) {
@@ -19,6 +29,7 @@ export default function TodayEngine({ onXPUpdate }: { onXPUpdate?: (xp: number) 
   const [loading, setLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
   const [executingTask, setExecutingTask] = useState<string | null>(null);
+  const [weekSync, setWeekSync] = useState<WeekSync | null>(null);
 
   useEffect(() => {
     loadFocus();
@@ -26,16 +37,35 @@ export default function TodayEngine({ onXPUpdate }: { onXPUpdate?: (xp: number) 
 
   const handleExecute = async (task: DailyTask) => {
     setExecutingTask(task.id);
-    // Simulate system intelligence pre-loading
     await new Promise(resolve => setTimeout(resolve, 800));
     setExecutingTask(null);
 
-    if (task.type === 'solve' || task.type === 'learn') {
-      navigate('/coding');
-    } else if (task.type === 'interview') {
+    const isInternalLink = task.link && task.link.startsWith('/');
+
+    if (task.type === 'interview') {
+      // Always route to internal interview page
       navigate('/interview');
-    } else {
+    } else if (task.type === 'solve') {
+      if (isInternalLink) {
+        // Problem exists in our Coding Lab — route internally
+        navigate(task.link!);
+      } else if (task.link) {
+        // Fall back to LeetCode in a new tab
+        window.open(task.link, '_blank');
+      } else {
+        navigate('/coding');
+      }
+    } else if (task.type === 'learn') {
+      // Always open curated resource in a new tab
+      if (task.link) {
+        window.open(task.link, '_blank');
+      } else {
+        navigate('/coding');
+      }
+    } else if (task.type === 'review') {
       navigate('/analytics');
+    } else if (task.link) {
+      window.open(task.link, '_blank');
     }
   };
 
@@ -43,24 +73,11 @@ export default function TodayEngine({ onXPUpdate }: { onXPUpdate?: (xp: number) 
     try {
       const res = await getTodayFocus();
       let loadedTasks = res.data.dailyFocus?.tasks || [];
-      
-      // Never show an empty state. If API returns nothing, provide intelligent fallbacks.
-      if (loadedTasks.length === 0) {
-        loadedTasks = [
-          { id: 'fallback-1', title: 'Review System Design Fundamentals', completed: false, type: 'learn', estMinutes: 30 },
-          { id: 'fallback-2', title: 'Complete 2 Random Medium DSA Problems', completed: false, type: 'solve', estMinutes: 45 },
-          { id: 'fallback-3', title: 'Update Resume Impact Metrics', completed: false, type: 'review', estMinutes: 15 },
-        ];
-      }
-      
       setTasks(loadedTasks);
+      if (res.data.weekSync) setWeekSync(res.data.weekSync);
     } catch (err) {
       console.error('Failed to load today focus:', err);
-      // Provide fallbacks on error as well
-      setTasks([
-        { id: 'err-1', title: 'Warm up: Array Manipulation', completed: false, type: 'solve', estMinutes: 20 },
-        { id: 'err-2', title: 'Read about Database Indexing', completed: false, type: 'learn', estMinutes: 25 },
-      ]);
+      setTasks([]);
     } finally {
       setLoading(false);
     }
@@ -143,6 +160,32 @@ export default function TodayEngine({ onXPUpdate }: { onXPUpdate?: (xp: number) 
           </div>
         </div>
       </div>
+
+      {/* Week Sync Progress Strip */}
+      {weekSync && (
+        <div className="px-6 py-3 border-b border-zinc-800/50 bg-zinc-950/50">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-zinc-400 font-medium">
+              Week {weekSync.weekNumber} Sync &mdash; <span className="text-white">{weekSync.weekFocus}</span>
+            </span>
+            <span className="text-xs font-mono">
+              <span className="text-emerald-400">{weekSync.dailyCompletions}</span>
+              <span className="text-zinc-600"> / 7 days completed</span>
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${(weekSync.dailyCompletions / 7) * 100}%` }}
+              transition={{ duration: 0.6 }}
+            />
+          </div>
+          <p className="text-xs text-zinc-600 mt-1">
+            Solve {weekSync.dailyQuota} problems/day &rarr; complete {weekSync.totalProblemsThisWeek} this week &rarr; Week {weekSync.weekNumber} done
+          </p>
+        </div>
+      )}
 
       <div className="p-6">
         {tasks.length === 0 ? (

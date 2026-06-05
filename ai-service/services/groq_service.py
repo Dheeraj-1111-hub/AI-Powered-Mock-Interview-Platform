@@ -25,9 +25,7 @@ def call_groq(prompt, system_message=None, temperature=0.2, json_mode=True):
         client = get_groq_client()
 
     if not client:
-        return {
-            "error": "Groq client initialization failed"
-        }
+        raise Exception("Groq client initialization failed. API key missing.")
 
     try:
         response_format = {"type": "json_object"} if json_mode else None
@@ -49,7 +47,4 @@ def call_groq(prompt, system_message=None, temperature=0.2, json_mode=True):
 
     except Exception as e:
         print("Groq API Error:", str(e))
-
-        return {
-            "error": str(e)
-        }
+        raise Exception(f"Groq API Error: {str(e)}")

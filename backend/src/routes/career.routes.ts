@@ -11,6 +11,7 @@ router.get('/intelligence', CareerController.getCareerIntelligence);
 router.get('/dna', CareerController.getDNAProfile);
 router.post('/profile/init', CareerController.initializeCareerProfile);
 router.post('/profile/save-progress', CareerController.saveOnboardingProgress);
+router.post('/reset', CareerController.resetCareerProgress);
 
 // Strategy
 router.post('/strategy/preview', CareerController.previewStrategyShift);
@@ -21,6 +22,7 @@ router.get('/roadmap', CareerController.getRoadmap);
 router.post('/roadmap/generate', CareerController.generateUserRoadmap);  // legacy compat
 router.post('/roadmap/adapt', CareerController.adaptRoadmap);
 router.post('/roadmap/complete-week', CareerController.completeWeek);
+router.get('/recommend-problem', CareerController.recommendProblem);
 
 // Mentor (with memory)
 router.post('/mentor/chat', CareerController.chatWithMentor);

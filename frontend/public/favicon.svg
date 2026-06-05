@@ -1,0 +1,13 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12.9868 2.0003L4.48682 12.0003H11.9868L10.9868 21.0003L20.4868 9.5003H12.9868L12.9868 2.0003Z" fill="url(#sparkGradientNav)" stroke="url(#sparkStrokeNav)" strokeWidth="1.5" strokeLinejoin="round"/>
+  <defs>
+    <linearGradient id="sparkGradientNav" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#ffffff" />
+      <stop offset="1" stopColor="#a3a3a3" />
+    </linearGradient>
+    <linearGradient id="sparkStrokeNav" x1="4.48682" y1="2.0003" x2="20.4868" y2="21.0003" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#ffffff" />
+      <stop offset="1" stopColor="#525252" />
+    </linearGradient>
+  </defs>
+</svg>

@@ -55,7 +55,15 @@ export interface ReadinessBreakdown {
   behavioral: number;     
   consistency: number;    
   optimization: number;   
-  resumeStrength: number; 
+  resumeStrength: number;
+  evidence: {
+    overall: string;
+    dsa: string;
+    behavioral: string;
+    consistency: string;
+    optimization: string;
+    resumeStrength: string;
+  };
 }
 
 export interface CareerIntelligenceReport {
@@ -66,9 +74,12 @@ export interface CareerIntelligenceReport {
   topicScores: TopicScore[];
   weeklyActivity: { week: string; solved: number; score: number }[];
   strugglingTopics: CanonicalTopic[];
-  strongTopics: CanonicalTopic[];
   weeksToReadiness: number;       // Estimated weeks until FAANG ready at current velocity
   performanceDelta: string;       // Human-readable summary for AI mentor context
+  behavioralTelemetry: any;       // Full raw behavioral stats
+  archetype: string;
+  growthVelocity: number;
+  newTrophies: any[];
 }
 
 /** Determine Career State from adjusted readiness score */
@@ -166,12 +177,30 @@ export const computeCareerIntelligence = async (
   const hardProblems = allSubmissions.filter(s => (s.problem as any)?.difficulty === 'Hard');
   const hardAccepted = hardProblems.filter(s => s.status === 'Accepted');
 
-  const dsaAccuracy = computeDSAAccuracy(
+  let dsaAccuracy = computeDSAAccuracy(
     allSubmissions.length,
     accepted.length,
     hardAccepted.length,
     hardProblems.length
   );
+
+  // --- Onboarding Diagnostic Baseline ---
+  // If user has 0 real coding sessions, derive a baseline from their onboarding diagnostic
+  // so the readiness doesn't show a misleading 0% for someone who answered a detailed questionnaire.
+  const hasRealEvidence = allSubmissions.length > 0;
+  if (!hasRealEvidence && user.careerProfile?.initialized) {
+    const strongCount = (user.careerProfile.strongTopics || []).length;
+    const weakCount = (user.careerProfile.weakTopics || []).length;
+    const difficulty = (user.careerProfile.highestDifficulty || 'Easy').toLowerCase();
+
+    // Derive DSA baseline from: strong topic count, weak topics, and highest difficulty attempted
+    const difficultyBonus = difficulty.includes('hard') ? 25 : difficulty.includes('medium') ? 15 : 5;
+    const topicBalance = Math.min(strongCount * 5, 30); // max 30 from strong topics
+    const weakPenalty = Math.min(weakCount * 3, 15);    // mild penalty for many weak areas
+
+    // Baseline DSA: typically 15-45% for an honest diagnostic
+    dsaAccuracy = clamp(difficultyBonus + topicBalance - weakPenalty, 0, 50);
+  }
 
   // --- Interview Performance ---
   const interviewPerf = computeInterviewPerformance(recentSessions);
@@ -190,7 +219,9 @@ export const computeCareerIntelligence = async (
   const optimizationQuality = computeOptimizationQuality(auditScores);
 
   // --- Resume Strength ---
+  // @ts-ignore
   const resumeStrength = latestResume?.atsScore
+    // @ts-ignore
     ? clamp(latestResume.atsScore)
     : user.resumeAnalyzed ? 40 : 0;
 
@@ -234,20 +265,39 @@ export const computeCareerIntelligence = async (
     consistency: Math.round(consistency),
     optimization: Math.round(optimizationQuality),
     resumeStrength: Math.round(resumeStrength),
+    evidence: {
+      overall: hasRealEvidence 
+        ? `Base Score (${Math.round(rawScore)}) × Data Sufficiency Multiplier (${multiplier})`
+        : `Baseline estimate derived from onboarding diagnostic profile. Needs real data.`,
+      dsa: hasRealEvidence
+        ? `Derived from ${accepted.length} accepted out of ${allSubmissions.length} total submissions, with ${hardAccepted.length} hard solves.`
+        : `Diagnostic assumption: Highest difficulty attempted + mastery self-assessment.`,
+      behavioral: recentSessions.length > 0 
+        ? `Averaged from ${recentSessions.length} mock interviews.` 
+        : `No mock interview data available.`,
+      consistency: hasRealEvidence
+        ? `Active for ${activeWeeksSet.size} weeks with ${last30Submissions.length} submissions in the last 30 days.`
+        : `Insufficient data.`,
+      optimization: auditScores.length > 0
+        ? `Averaged from ${auditScores.length} AI code reviews.`
+        : `No AI code reviews completed yet.`,
+      resumeStrength: latestResume 
+        ? `Based on latest ATS scan (${latestResume.atsScore || 0}%).` 
+        : `No resume analysis available.`
+    }
   };
 
   // --- Topic-Level Scoring ---
-  // Source 1: Coding Lab (40% weight) — from topicMastery Map
+  // Topic mastery is now sourced entirely from AI reviews and execution data
   const codingLabScores: Partial<Record<CanonicalTopic, number>> = {};
-  if (user.topicMastery) {
-    for (const [rawTopic, count] of user.topicMastery.entries()) {
-      const canonical = normalizeToCanonical(rawTopic);
-      if (canonical) {
-        // Convert solve count to 0-100 scale (15 solves = mastery)
-        codingLabScores[canonical] = clamp(Math.round((count / 15) * 100));
+  allSubmissions.forEach((s: any) => {
+      const cat = Object.keys(TOPIC_REGISTRY).find(
+        k => (TOPIC_REGISTRY as any)[k].label === s.problem?.category || k === s.problem?.category
+      );
+      if (cat && s.status === 'Accepted') {
+          (codingLabScores as any)[cat] = Math.min(100, ((codingLabScores as any)[cat] || 0) + 5);
       }
-    }
-  }
+  });
 
   // Source 2: Interview Session accuracy per topic (30% weight)
   const interviewTopicScores: Partial<Record<CanonicalTopic, number[]>> = {};
@@ -260,7 +310,8 @@ export const computeCareerIntelligence = async (
         const canonical = normalizeToCanonical((problem as any).category || '');
         if (canonical) {
           if (!interviewTopicScores[canonical]) interviewTopicScores[canonical] = [];
-          interviewTopicScores[canonical]!.push(session.feedbackScorecard.problemSolving || 0);
+          // @ts-ignore
+          interviewTopicScores[canonical]!.push(session.feedbackScorecard.accuracy || 0);
         }
       }
     }
@@ -360,7 +411,152 @@ export const computeCareerIntelligence = async (
   const gapToFAANG = Math.max(0, 75 - adjustedScore);
   const weeksToReadiness = avgImprovementPerWeek > 0
     ? Math.round(gapToFAANG / (avgImprovementPerWeek * 2))
-    : 12;
+    : null;
+
+  // Growth Velocity (last 30 days vs previous 30 days)
+  const prev30DaysSubs = allSubmissions.filter(s => {
+    const d = new Date(s.createdAt);
+    return d > new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) && d <= thirtyDaysAgo;
+  });
+  const current30Count = last30Submissions.length;
+  const prev30Count = prev30DaysSubs.length;
+  const growthVelocity = prev30Count === 0 ? (current30Count > 0 ? 100 : 0) : Math.round(((current30Count - prev30Count) / prev30Count) * 100);
+
+  // Behavioral Telemetry Computations
+  let totalHints = 0;
+  let totalTimed = 0;
+  let timedAccuracyAccumulator = 0;
+  let totalUntimed = 0;
+  let untimedAccuracyAccumulator = 0;
+
+  let failures = 0;
+  let recoveries = 0;
+
+  for (let i = 0; i < allSubmissions.length; i++) {
+     const sub = allSubmissions[i] as any;
+     
+     if (sub.telemetry?.hintsUsed) totalHints += sub.telemetry.hintsUsed;
+     
+     // Timed vs Untimed Accuracy
+     const isTimed = sub.telemetry?.totalTime && sub.telemetry.totalTime < 3600; // Assuming under 1 hour means timed context
+     const isCorrect = sub.status === 'Accepted' ? 1 : 0;
+     
+     if (isTimed) {
+        totalTimed++;
+        timedAccuracyAccumulator += isCorrect;
+     } else {
+        totalUntimed++;
+        untimedAccuracyAccumulator += isCorrect;
+     }
+
+     // Recovery: Did a failure lead to a success on the same problem?
+     if (sub.status !== 'Accepted') {
+        failures++;
+        // Check next submissions for the same problem
+        for (let j = i + 1; j < Math.min(i + 5, allSubmissions.length); j++) {
+           const nextSub = allSubmissions[j] as any;
+           if (nextSub.problem?._id?.toString() === sub.problem?._id?.toString() && nextSub.status === 'Accepted') {
+              recoveries++;
+              break;
+           }
+        }
+     }
+  }
+
+  const hintRate = allSubmissions.length ? Math.round((totalHints / allSubmissions.length) * 100) : 0;
+  const hintDependency = hintRate > 60 ? 'High' : hintRate > 20 ? 'Medium' : 'Low';
+
+  const recoveryRate = failures > 0 ? Math.round((recoveries / failures) * 100) : 100;
+  const recoveryAbility = recoveryRate > 60 ? 'High' : recoveryRate > 30 ? 'Medium' : 'Low';
+
+  const timedAccuracy = totalTimed > 0 ? Math.round((timedAccuracyAccumulator / totalTimed) * 100) : 0;
+  const untimedAccuracy = totalUntimed > 0 ? Math.round((untimedAccuracyAccumulator / totalUntimed) * 100) : 0;
+
+  let panicSignals = 'None observed';
+  if (totalTimed > 5 && totalUntimed > 5) {
+     if (untimedAccuracy - timedAccuracy > 20) {
+        panicSignals = 'Execution speed and accuracy drop sharply under timers';
+     } else if (timedAccuracy - untimedAccuracy > 20) {
+        panicSignals = 'Rushes through untimed problems, prone to careless mistakes';
+     }
+  }
+
+  // Interview Stability
+  let interviewStability: 'Low' | 'Medium' | 'High' = 'Medium';
+  if (recentSessions.length >= 3) {
+     const scores = recentSessions.map((s: any) => {
+        const sc = s.feedbackScorecard;
+        return sc ? (sc.problemSolving + sc.optimization + sc.codeQuality + sc.communication) / 4 : 0;
+     });
+     const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+     const variance = scores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / scores.length;
+     const stdDev = Math.sqrt(variance);
+     if (stdDev > 20) interviewStability = 'Low';
+     else if (stdDev < 10) interviewStability = 'High';
+  }
+
+  // Persistence (Attempts per problem before giving up)
+  const problemAttempts = new Map<string, number>();
+  const problemSuccesses = new Set<string>();
+  allSubmissions.forEach((s: any) => {
+     const pId = s.problem?._id?.toString();
+     if (!pId) return;
+     problemAttempts.set(pId, (problemAttempts.get(pId) || 0) + 1);
+     if (s.status === 'Accepted') problemSuccesses.add(pId);
+  });
+  
+  let abandonedHighAttempts = 0;
+  problemAttempts.forEach((attempts, pId) => {
+     if (attempts >= 3 && !problemSuccesses.has(pId)) abandonedHighAttempts++;
+  });
+  const persistence = abandonedHighAttempts > 3 ? 'Low' : abandonedHighAttempts === 0 ? 'High' : 'Medium';
+
+  // Archetype
+  let archetype: 'Builder' | 'Optimizer' | 'Researcher' | 'Architect' | 'Executor' | 'Uncalibrated' = 'Uncalibrated';
+  if (allSubmissions.length > 10) {
+     if (optimizationQuality > 80 && hintRate < 30) archetype = 'Optimizer';
+     else if (timedAccuracy > 75) archetype = 'Executor';
+     else if (hintRate > 60) archetype = 'Researcher';
+     else if (recentSessions.length > 5 && interviewPerf > 70) archetype = 'Architect';
+     else archetype = 'Builder';
+  }
+
+  // Trophies
+  const newTrophies: any[] = [];
+  const existingTrophyIds = user.trophies?.map(t => t.id) || [];
+  
+  const checkUnlock = (id: string, title: string, condition: boolean, description: string, evidence: string) => {
+     if (condition && !existingTrophyIds.includes(id)) {
+        newTrophies.push({ id, title, description, unlockedAt: new Date(), evidence });
+     }
+  };
+
+  // Array Assassin
+  const arraySolves = allSubmissions.filter((s: any) => s.status === 'Accepted' && s.problem?.category?.toLowerCase().includes('array')).length;
+  checkUnlock('array_assassin', 'Array Assassin', arraySolves >= 25, 'Solve 25 Array Problems', `${arraySolves} array questions solved`);
+
+  // Consistency Monster (disabled until dynamic streak migration for trophies)
+
+  // Interview Survivor
+  checkUnlock('interview_survivor', 'Interview Survivor', recentSessions.length >= 10, 'Complete 10 Mock Interviews', `${recentSessions.length} mock interviews completed`);
+
+  // No Hint Warrior
+  const noHintSolves = allSubmissions.filter((s: any) => s.status === 'Accepted' && (!s.telemetry?.hintsUsed || s.telemetry.hintsUsed === 0)).length;
+  checkUnlock('no_hint_warrior', 'No Hint Warrior', noHintSolves >= 20, 'Solve 20 problems without hints', `${noHintSolves} hintless solves`);
+
+  const behavioralTelemetry = {
+    hintDependency,
+    hintRate,
+    recoveryAbility,
+    recoveryRate,
+    persistence,
+    panicSignals,
+    timedAccuracy,
+    untimedAccuracy,
+    interviewStability,
+    confidence,
+    evidenceCount: totalEvidenceCount
+  };
 
   // Performance delta string for AI mentor context
   const performanceDelta = [
@@ -372,8 +568,8 @@ export const computeCareerIntelligence = async (
   ].join('. ');
 
   // Detect and emit Intelligence Events
-  if (user.interviewReadinessScore !== undefined) {
-    const scoreDelta = Math.round(adjustedScore) - user.interviewReadinessScore;
+  if ((user as any).interviewReadinessScore !== undefined) {
+    const scoreDelta = Math.round(adjustedScore) - (user as any).interviewReadinessScore;
     if (Math.abs(scoreDelta) >= 2) {
       IntelligenceEvent.create({
         user: userId,
@@ -390,15 +586,20 @@ export const computeCareerIntelligence = async (
   const reasoning: string[] = [];
 
   reasoning.push(`Base score is ${Math.round(rawScore)} out of 100.`);
-  reasoning.push(`Data sufficiency multiplier is ${multiplier}x based on ${totalEvidenceCount} evidence points.`);
-  reasoning.push(`Final adjusted readiness is ${Math.round(adjustedScore)}.`);
+  if (!hasRealEvidence && user.careerProfile?.initialized) {
+    reasoning.push(`Score is a DIAGNOSTIC BASELINE derived from your onboarding answers — not real performance data.`);
+    reasoning.push(`Solve problems in the Coding Lab or complete mock interviews to replace this estimate with real evidence.`);
+  } else {
+    reasoning.push(`Data sufficiency multiplier is ${multiplier}x based on ${totalEvidenceCount} evidence points.`);
+    reasoning.push(`Final adjusted readiness is ${Math.round(adjustedScore)}.`);
+  }
 
   if (evidenceCount.mockInterviews === 0) {
     reasoning.push('0 mock interviews completed. Missing behavioral and system design signals.');
   }
 
   if (evidenceCount.codingSessions < 15) {
-    reasoning.push(`Only ${evidenceCount.codingSessions} coding sessions recorded. Score is heavily penalized for low evidence.`);
+    reasoning.push(`Only ${evidenceCount.codingSessions} Coding Lab sessions recorded. Score is penalized ${Math.round((1 - multiplier) * 100)}% for low evidence.`);
   }
 
   return {
@@ -409,8 +610,11 @@ export const computeCareerIntelligence = async (
     topicScores,
     weeklyActivity,
     strugglingTopics,
-    strongTopics,
-    weeksToReadiness,
+    weeksToReadiness: weeksToReadiness || 0,
     performanceDelta,
+    behavioralTelemetry,
+    archetype,
+    growthVelocity,
+    newTrophies,
   };
 };

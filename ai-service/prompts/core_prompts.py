@@ -20,49 +20,141 @@ PERSONA_BEHAVIORS = {
 }
 
 RESUME_ANALYSIS_PROMPT = """
-Act as a FAANG Recruiter. Analyze the following resume text against the Job Description.
-Scoring Rubric (0-100):
-- Formatting: Standard sections, readability.
-- Impact: Quantifiable metrics (e.g., "Increased X by Y%").
-- Tech Stack: Alignment with target role.
-- Keywords: ATS compatibility.
+Act as a strict, FAANG-level ATS (Applicant Tracking System) and Senior Technical Recruiter.
+You are analyzing this resume for a candidate profile.
 
-You MUST return a JSON object:
+Candidate Career Profile (Source of Truth):
+{profileData}
+
+Job Description (if any):
+{jobDescription}
+
+Evaluate the resume meticulously using the EXACT scoring rubrics below. Do not hallucinate scores.
+
+*** SCORING RUBRICS (STRICTLY FOLLOW THESE) ***
+1. globalAts.total:
+   - Start at 30 points.
+   - Add +10 if an Education section is found.
+   - Add +10 if a Skills section is found.
+   - Add +10 if a Projects section is found.
+   - Add +10 if an Experience section is found.
+   - Add +20 if the formatting is clean (single-column, machine-readable, no tables).
+   - Add +10 if quantifiable metrics exist.
+   - Maximum is 100. Minimum is 0.
+
+2. jobAlignment:
+   - Carefully extract ALL HARD TECHNICAL SKILLS (programming languages, frameworks, databases, architectures like REST/OOP/DSA) from the Job Description.
+   - Ignore soft skills (e.g., "fast-paced", "team player", "awesome", "impact").
+   - Categorize the extracted hard skills STRICTLY into 'presentKeywords' (found in resume) and 'missingKeywords' (not found).
+   - Do NOT calculate a score. Let the Python engine do the math.
+
+3. projectQuality.score:
+   - 85-100: Complex distributed systems, microservices, AI pipelines, strong metrics, uses advanced tech (e.g., Redis, FastAPI, Agents).
+   - 60-84: Standard full-stack apps with React/Node/DB.
+   - 0-59: Basic HTML/CSS/JS calculators or simple To-Do lists.
+
+4. recruiterImpact.score:
+   - 80-100: Heavy use of action verbs, quantifiable metrics, and leadership.
+   - 60-79: Good action verbs but lacks heavy metrics.
+   - 0-59: Passive language, task-based descriptions instead of impact-based.
+
+You must return EXACTLY the following JSON structure. Do NOT wrap it in markdown. Do not hallucinate scores—base everything directly on the text and the above rubrics.
+
 {{
-    "atsScore": int,
-    "roleMatch": int,
-    "keywordGaps": [string],
-    "strengths": [string],
-    "weaknesses": [string],
-    "rewriteSuggestions": [string],
+    "globalAts": {{
+        "format": int,
+        "keywords": int,
+        "sections": int,
+        "readability": int,
+        "parsing": int,
+        "total": int
+    }},
+    "jobAlignment": {{
+        "score": int,
+        "presentKeywords": [string],
+        "missingKeywords": [string]
+    }},
+    "recruiterImpact": {{
+        "score": int,
+        "metrics": {{
+            "actionVerbs": int,
+            "leadership": int,
+            "impactMetrics": int,
+            "ownership": int,
+            "technicalDepth": int
+        }}
+    }},
+    "projectQuality": {{
+        "score": int,
+        "evaluations": [
+            {{
+                "projectName": string,
+                "complexity": int,
+                "techDepth": int,
+                "architecture": int,
+                "impact": int,
+                "reason": string
+            }}
+        ]
+    }},
+    "dynamicGuidelines": [
+        {{ "rule": "Avoid Tables", "status": "passed" | "failed", "message": string }},
+        {{ "rule": "Quantifiable Metrics", "status": "passed" | "failed", "message": string }},
+        {{ "rule": "Clear Section Headers", "status": "passed" | "failed", "message": string }}
+    ],
+    "sectionQuality": [
+        {{ "name": "Experience", "score": int, "feedback": string }},
+        {{ "name": "Projects", "score": int, "feedback": string }},
+        {{ "name": "Education", "score": int, "feedback": string }}
+    ],
+    "skillDNA": {{
+        "keywords": int,
+        "impact": int,
+        "brevity": int,
+        "actionVerbs": int,
+        "formatting": int
+    }},
     "bulletImprovements": [
-        {{ "original": string, "improved": string, "reason": string }}
+        {{
+            "original": string,
+            "improved": string,
+            "changes": [
+                {{ "type": "Added Metric" | "Action Verb" | "Technical Context", "description": string }}
+            ]
+        }}
     ],
-    "recruiterInsights": string,
-    "sectionScores": {{ "experience": int, "education": int, "skills": int, "summary": int }},
-    "keywordHighlighting": [
-        {{ "keyword": string, "type": "skill" | "action" | "impact", "status": "present" | "missing" }}
-    ],
-    "radarScores": {{ "impact": int, "keywords": int, "brevity": int, "actionVerbs": int, "formatting": int }}
+    "keywordIntelligence": {{
+        "present": [string],
+        "missing": [string],
+        "overused": [string],
+        "weak": [string]
+    }},
+    "recruiterFeedback": {{
+        "strengths": [string],
+        "concerns": [string],
+        "recommendation": "Interview Worthy" | "Borderline" | "Needs Work"
+    }},
+    "sixSecondScan": {{
+        "good": [string],
+        "bad": [string]
+    }}
 }}
 
-JD: {jobDescription}
-Resume: {text}
+Resume Text:
+{text}
 """
 
 INTERVIEW_GEN_PROMPT = """
-Generate a personalized, multi-round interview plan.
+Generate a personalized, progressive interview plan focused on measurable skills.
 Candidate Profile: {experience} {role}
-Tech Stack: {stack}
-Resume Context: {resumeInfo}
+Company Type: {companyType}
+Tech Stack Weights: {stack}
 Interviewer Persona: {persona} (Behavior: {behavior})
 
 Plan Structure:
-1. Start with a warm-up.
-2. Progressive technical deep-dives based on the resume.
-3. System design or behavioral rounds.
-
-CRITICAL INSTRUCTION: Ensure ALL technical questions strictly target the provided Tech Stack ({stack}). If the stack says 'Python', DO NOT ask about React, JavaScript, or unrelated technologies regardless of the Candidate Role.
+1. Extract the implicit Target Skills from the Role and Tech Stack (e.g., 'React State', 'System Design', 'Performance', 'Tradeoffs').
+2. Ensure technical depth matches the {experience} level. A Junior gets 'Implementation', a Senior gets 'Tradeoffs and Scaling'.
+3. The interview MUST measure the extracted Target Skills.
 
 You MUST return a JSON:
 {{
@@ -72,7 +164,13 @@ You MUST return a JSON:
             "name": string,
             "duration": string,
             "questions": [
-                {{ "text": string, "expectedKeywords": [string], "difficulty": "Easy" | "Medium" | "Hard", "topic": string }}
+                {{
+                    "text": string,
+                    "skill": string,
+                    "difficulty": "Easy" | "Medium" | "Hard",
+                    "weight": int,
+                    "expectedDepth": int
+                }}
             ]
         }}
     ]
@@ -80,28 +178,32 @@ You MUST return a JSON:
 """
 
 EVALUATION_PROMPT = """
-Evaluate the candidate's answer with deep technical reasoning.
+Evaluate the candidate's answer with deep technical and behavioral reasoning.
 Question: {question}
 Answer: {answer}
+Targeted Skill: {skill}
 Previous Context: {transcript}
-Persona Behavior: {behavior}
+Real-Time Telemetry: {telemetry}
 
-Evaluation Metrics:
-- Accuracy: Correctness of technical concepts.
-- Communication: Clarity and structure.
-- Depth: Did they explain the 'Why'?
+Evaluate on multiple dimensions (0-100 scale):
+- Accuracy: Technical correctness.
+- Depth: How well did they explain 'Why'?
+- Communication: Structure, clarity. PENALIZE if 'Filler Words' in telemetry is high (>5).
+- Confidence: Assuredness in the response. PENALIZE heavily if 'Latency to Answer' is extremely high (>30000ms), as it implies Googling or hesitation.
+- Practicality: Real-world viability.
 
 You MUST return a JSON:
 {{
-    "score": int,
-    "confidence": "Strong" | "Moderate" | "Weak",
-    "clarity": "Excellent" | "Good" | "Needs Work",
-    "technicalCorrectness": string,
+    "accuracy": int,
+    "depth": int,
+    "communication": int,
+    "confidence": int,
+    "practicality": int,
     "mistakes": [string],
-    "failureReasons": [string],
     "idealAnswer": string,
     "shouldFollowUp": boolean,
-    "followUpReason": string
+    "followUpReason": string,
+    "skillDelta": int
 }}
 """
 
@@ -128,17 +230,21 @@ FOLLOW_UP_PROMPT = """
 You are {persona} ({behavior}). 
 The candidate just answered: "{prevAnswer}" to the question: "{prevQuestion}".
 
+Session Transcript (Memory):
+{transcript}
+
 Round: {roundName}
 
 If the answer was strong, ask a deeper 'level 2' question on the same topic.
 If the answer was weak or vague, ask them to clarify specific points.
-If they mentioned a technology (e.g., 'Kafka'), ask about a trade-off related to it.
+Crucially: Detect if they mentioned a specific technology or design pattern. If so, drill into its specific trade-offs.
 
 You MUST return a JSON:
 {{
     "text": string,
-    "expectedKeywords": [string],
+    "skill": string,
     "difficulty": "Medium" | "Hard",
+    "expectedDepth": int,
     "intent": string
 }}
 """
@@ -151,15 +257,19 @@ Problem: {problemDescription}
 Static Code Profile (Do NOT hallucinate missing structures if they exist here): 
 {staticAnalysis}
 
+Execution Status: {executionStatus}
+Execution Results (Test Cases): {executionResults}
+
 Code: {code}
 
 Perform a deep architectural review. Do NOT just look for syntax.
+CRITICAL RULE: If the Execution Status is NOT 'Accepted' or if ANY Test Cases failed, the submission failed. DO NOT hallucinate or invent bugs in the core logic if the algorithm is correct! If the logic is perfectly correct but execution failed, it is highly likely an I/O parsing error (e.g., failing to strip literal double quotes from standard input strings, or printing the wrong format). In your feedback, explicitly mention that the algorithm looks correct but failed the automated tests, likely due to standard input/output formatting. Lower the score accordingly (max 75), but do not fabricate false "code smells" or non-existent bugs.
 1. Complexity Detection: What is the exact Time and Space complexity? Why? (Respect the Static Code Profile: if it says usesHashMap: true, acknowledge the O(N) lookup! Note: Nested loops are often REQUIRED for Dynamic Programming and Matrices, do not blindly penalize them as code smells).
 2. Detect Better Approaches: Is there a more optimal solution?
-3. Code Smell Detection: Look for deep nesting, duplicate logic, unused variables, memory inefficiency, or poor naming.
+3. Code Smell Detection: Look for deep nesting, duplicate logic, unused variables, memory inefficiency, or poor naming. CRITICAL: DO NOT hallucinate variables, lines, or "magic numbers" that do not literally exist in the code snippet. If you mention a smell, you must refer to the exact variable or line in the provided code.
 4. Security/Edge Cases: Look for potential infinite recursion, out-of-bounds, mutation of input, or null reference errors.
-5. Interviewer Feedback: Provide 2 sentences of direct feedback you would tell the candidate.
-6. Score: Calculate an integer score strictly between 0 and 100 (e.g., 85, 95, 100). Do NOT use a 10-point scale.
+5. Interviewer Feedback: Provide 2 sentences of direct feedback you would tell the candidate. If the code failed tests, tell them what failed.
+6. Score: Calculate an integer score strictly between 0 and 100 (e.g., 85, 95, 100). Do NOT use a 10-point scale. If tests failed, score must be <= 60.
 
 
 You MUST return a JSON:
@@ -228,31 +338,50 @@ MENTOR_PERSONAS = {
 }
 
 CAREER_PROFILE_INIT_PROMPT = """
-You are a senior FAANG career strategist. A candidate has just completed their career profile onboarding.
-Generate a personalized, week-by-week study plan and skill gap analysis.
+You are a senior FAANG career strategist and a rigorous data engine. A candidate has just completed their diagnostic capability test.
+Generate a personalized, mathematical week-by-week study plan, skill gap analysis, and the initial 'careerBrain' state.
 
 Candidate Profile:
 - Target Role: {targetRole}
 - Target Company: {targetCompany}
+- Timeline / Duration: {timeline}
 - Current Year/Level: {currentYear}
-- DSA Comfort (1-10): {dsaComfort}
-- System Design Comfort (1-10): {systemDesignComfort}
+- Diagnostic Score: {dsaComfort}/10
+- System Design Comfort: {systemDesignComfort}/10
 - Daily Hours Available: {dailyHoursAvailable}
-- Self-reported Weak Topics: {weakTopics}
-- Self-reported Strong Topics: {strongTopics}
-- Mentor Persona: {persona}
+- Demonstrated Weak Topics (from Diagnostic): {weakTopics}
+- Demonstrated Strong Topics (from Diagnostic): {strongTopics}
+- Advisor Persona: {persona}
 
-VALIDATION RULES (you MUST follow these):
-1. Week 1-2 MUST focus on fundamentals (Arrays, Strings, Hashing) regardless of self-reported comfort.
-2. DP and Graphs CANNOT appear before Week 4.
-3. System Design cannot appear before Week 6.
-4. Hard problems cannot be the majority until Week 8+.
-5. Mock interviews should start at Week 3 (1 per week) and increase to 2-3 by Week 8+.
-6. Generate exactly 12 weeks of plan.
+INTELLIGENCE ALGORITHM (YOU MUST FOLLOW THIS EXACTLY):
+1. Determine CompanyWeights: e.g. if Target Company is Nvidia, weight Deep Learning & CUDA higher. If Google, weight DSA & System Design higher.
+2. Determine AdvisorWeights: e.g. if Persona is FAANG, prioritize DSA/SysDesign. If CTO, prioritize Projects/Execution. If Recruiter, prioritize Resume/Behavioral.
+3. Determine WeaknessScore: Target topics the candidate is weakest in first.
+4. Calculate Priority = CompanyWeights * AdvisorWeights * WeaknessScore.
+5. Structure the `weeklyPlan` so that the topics with the highest Priority are assigned FIRST.
+6. Generate EXACTLY {targetWeekCount} entries in the `weeklyPlan` array. Do not generate fewer weeks than requested.
+7. For each week's `specificProblems` array, you MUST generate exactly 7 to 14 UNIQUE specific LeetCode problem titles (e.g., 'LeetCode 1. Two Sum'). Do not repeat problems! This volume is critical so that the weekly workload can be evenly chunked across a 7-day daily execution schedule.
 
-You MUST return a JSON:
+You MUST return a JSON matching this exact structure:
 {{
     "title": string,
+    "confidenceProfile": {{
+        "level": "LOW" | "MEDIUM" | "HIGH",
+        "reason": "Explain exactly why this confidence level was chosen based on the limited diagnostic data provided."
+    }},
+    "readinessBreakdown": {{
+        "total": int (0-100),
+        "components": [
+            {{ "name": "DSA", "weight": int, "score": int }},
+            {{ "name": "System Design", "weight": int, "score": int }},
+            {{ "name": "Behavioral", "weight": int, "score": int }}
+        ]
+    }},
+    "skillGraph": {{
+        "Arrays": int,
+        "Dynamic Programming": int
+        // Map exact topic names to a score 0-100 based on the diagnostic data
+    }},
     "skillGaps": [{{ "skill": string, "importance": "Critical" | "Important" | "Low", "description": string }}],
     "phases": [
         {{ "name": string, "duration": string, "tasks": [string] }}
@@ -263,11 +392,11 @@ You MUST return a JSON:
             "focus": string,
             "topics": [string],
             "problems": int,
+            "specificProblems": [string],
             "difficulty": "Easy" | "Mixed" | "Medium" | "Hard",
             "mockInterviews": int,
             "keyMilestone": string,
-            "confidenceScore": int,
-            "decisionReasoning": string
+            "priorityReason": "Explain exactly how CompanyWeight, AdvisorWeight, and WeaknessScore influenced this week's focus."
         }}
     ]
 }}
@@ -306,6 +435,7 @@ Return ONLY the updated weeks (not completed ones). You MUST return a JSON:
             "focus": string,
             "topics": [string],
             "problems": int,
+            "specificProblems": [string],
             "difficulty": "Easy" | "Mixed" | "Medium" | "Hard",
             "mockInterviews": int,
             "adaptationReason": string,
@@ -359,13 +489,16 @@ daily execution list for the candidate based on their current weaknesses and roa
 Candidate Target Role: {targetRole}
 Current Struggling Topics: {strugglingTopics}
 Current Week Roadmap: {currentRoadmapWeek}
+Roadmap Specific Problems Assigned For This Week: {roadmapSpecificProblems}
 Available Time (minutes): {availableMinutes}
 
 RULES:
-1. Generate exactly 3 to 4 actionable tasks for TODAY.
-2. The tasks must fit within the Available Time. Assign realistic 'estMinutes' to each.
-3. Base the tasks on their Struggling Topics. If they are failing DP, make them do DP.
-4. The 'type' must be one of: 'solve', 'interview', 'learn', 'review'.
+1. Generate exactly 2 actionable tasks for TODAY.
+2. DO NOT generate ANY 'solve' (coding) tasks. The backend engine will deterministically inject the coding problems.
+3. You must ONLY generate tasks of type: 'learn' (for reading/videos), 'interview' (for mock interviews), or 'review' (for resumes/portfolios).
+4. Total estMinutes across all tasks MUST NOT exceed {availableMinutes}.
+5. If they have mock interviews in their current roadmap week, include a practice interview task.
+6. Make sure the tasks relate to the Current Struggling Topics or the Current Week Roadmap focus.
 
 You MUST return a JSON matching this schema exactly:
 {{
@@ -374,8 +507,55 @@ You MUST return a JSON matching this schema exactly:
             "id": string (unique identifier like "task_1"),
             "title": string (e.g. "Solve 2 BFS Mediums", "Redo Failed DP Interview"),
             "type": "solve" | "interview" | "learn" | "review",
-            "estMinutes": number
+            "estMinutes": number,
+            "link": string
         }}
     ]
+}}
+"""
+
+PROACTIVE_INTERRUPT_PROMPT = """
+You are the AI Technical Interviewer (Persona: {interviewerPersona}, Tone: {tone}).
+The candidate is currently solving this DSA problem:
+{problemDescription}
+
+Their current code draft in {language}:
+```{language}
+{code}
+```
+
+Task:
+Analyze their code-in-progress. Do they have a glaring architectural flaw? Are they using O(N^2) instead of O(N) where obviously inappropriate? Are they stuck or writing messy spaghetti code?
+
+If there is a clear reason to interrupt them with a proactive question (e.g. "Why are you using a nested loop? Could you optimize this?", "I see you chose an Array here, have you considered a HashMap?"), return exactly a JSON object with 'interrupt' set to true and your 'message'.
+If their code is fine, or it's too early to tell, return 'interrupt' set to false.
+
+You MUST return a JSON matching this schema:
+{{
+    "interrupt": boolean,
+    "message": string
+}}
+"""
+
+INTERVIEW_SUMMARY_PROMPT = """
+You are the Lead Recruiter / Hiring Manager evaluating a candidate's {role} interview.
+Review the following complete interview transcript to generate a comprehensive scorecard.
+
+Transcript:
+{transcript}
+
+You MUST generate exact scores from 1 to 100 for the following categories based on their performance, and provide detailed strengths and weaknesses.
+
+You MUST return a JSON matching this exact schema:
+{{
+    "communicationScore": int,
+    "technicalScore": int,
+    "confidenceScore": int,
+    "problemSolvingScore": int,
+    "summary": string,
+    "strengths": [string],
+    "weaknesses": [string],
+    "recommendations": [string],
+    "verdict": "HIRE" | "NO HIRE" | "CONSIDER"
 }}
 """

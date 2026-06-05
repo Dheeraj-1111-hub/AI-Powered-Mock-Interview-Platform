@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import ResumeAnalysis from '../models/ResumeAnalysis';
+import ActivityLog from '../models/ActivityLog';
 import User from '../models/User';
 import { reqUser } from '../middleware/auth';
 import aiClient from '../services/aiClient';
@@ -22,6 +23,7 @@ export const analyzeResume = async (req: Request, res: Response) => {
     const allowedMimeTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
       'text/plain'
     ];
     
@@ -35,6 +37,9 @@ export const analyzeResume = async (req: Request, res: Response) => {
     }
 
     // Call AI Service
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
     const formData = new FormData();
     formData.append('resume', fs.createReadStream(file.path), {
       filename: file.originalname,
@@ -44,6 +49,18 @@ export const analyzeResume = async (req: Request, res: Response) => {
     if (jobDescription) {
       formData.append('jobDescription', jobDescription);
     }
+    
+    // Inject unified Career Profile
+    const profileData = {
+        role: user.role,
+        seniority: user.experience,
+        skills: user.skills,
+        strengths: user.careerProfile?.strongTopics || [],
+        weaknesses: user.careerProfile?.weakTopics || [],
+        targetCompany: user.careerProfile?.targetCompany || user.careerProfile?.dreamCompany || '',
+        targetRole: user.careerProfile?.targetRole || user.role
+    };
+    formData.append('profileData', JSON.stringify(profileData));
 
     const aiResponse = await aiClient.post('/resume', formData, {
       headers: { ...formData.getHeaders() }
@@ -52,11 +69,17 @@ export const analyzeResume = async (req: Request, res: Response) => {
 
     const analysisData = aiResponse.data.analysis;
     let analysis;
+    
     try {
         analysis = typeof analysisData === 'string' ? JSON.parse(analysisData) : analysisData;
+        
+        if (analysis?.error || !analysis?.globalAts) {
+             console.error('[RESUME CONTROLLER] AI returned an error or incomplete data:', analysis?.error);
+             throw new Error('Incomplete data from AI Service');
+        }
     } catch (parseError) {
         console.error('[RESUME CONTROLLER] Failed to parse AI response:', analysisData);
-        throw new Error('Malformed AI response');
+        throw new Error('Failed to parse AI resume analysis');
     }
 
     const newAnalysis = new ResumeAnalysis({
@@ -73,8 +96,22 @@ export const analyzeResume = async (req: Request, res: Response) => {
     // Update user status
     await User.findByIdAndUpdate(userId, {
       resumeUrl: file.path,
-      resumeAnalyzed: true
+      resumeAnalyzed: true,
+      readinessLastComputed: null // Phase 4: Cross-Feature Validation
     });
+
+    // TRIGGER DATABASE TRUTH EVENT (ActivityLog)
+    try {
+      await ActivityLog.create({
+        user: userId,
+        type: 'resume_scanned',
+        xpAwarded: 50, // Flat reward for uploading resume
+        metadata: {
+          resumeScanId: newAnalysis._id,
+          score: analysis.globalAts?.atsScore || 0
+        }
+      });
+    } catch(err) { console.error('[RESUME CONTROLLER] ActivityLog creation failed:', err); }
 
     res.json(newAnalysis);
   } catch (error: any) {

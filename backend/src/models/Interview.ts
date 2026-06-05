@@ -17,11 +17,18 @@ export interface IInterview extends Document {
     questions: Array<{
       text: string;
       answer?: string;
+      latencyMs?: number;
       evaluation?: {
-        score: number;
-        confidence: string;
-        clarity: string;
-        technicalCorrectness: string;
+        accuracy: number;
+        depth: number;
+        communication: number;
+        confidence: number;
+        practicality: number;
+        skillDelta: number;
+        voiceMetrics?: {
+          wpm: number;
+          fillerWordCount: number;
+        };
         mistakes: string[];
         idealAnswer: string;
       };
@@ -59,11 +66,18 @@ const interviewSchema = new Schema<IInterview>({
     questions: [{
       text: String,
       answer: String,
+      latencyMs: Number,
       evaluation: {
-        score: Number,
-        confidence: String,
-        clarity: String,
-        technicalCorrectness: String,
+        accuracy: Number,
+        depth: Number,
+        communication: Number,
+        confidence: Number,
+        practicality: Number,
+        skillDelta: Number,
+        voiceMetrics: {
+          wpm: Number,
+          fillerWordCount: Number
+        },
         mistakes: [String],
         idealAnswer: String
       },
