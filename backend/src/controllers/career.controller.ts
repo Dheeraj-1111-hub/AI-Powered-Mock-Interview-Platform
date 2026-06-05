@@ -154,12 +154,16 @@ const validateAndSortWeeklyPlan = async (
 
 /** GET /career/intelligence — Main data fetch, deterministic computation */
 export const getCareerIntelligence = async (req: Request, res: Response) => {
+  let step = 'init';
   try {
+    step = 'auth';
     const userId = reqUser(req);
+    step = 'find_user';
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     // Graceful migration logic
+    step = 'migration';
     if (user.careerProfile?.initialized && (!user.careerStrategies || user.careerStrategies.length === 0)) {
       user.careerStrategies = [{
         targetCompany: user.careerProfile.targetCompany || 'Unknown',
@@ -170,7 +174,6 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
         createdAt: new Date(),
       }] as any;
       await user.save();
-      // Have to fetch again to get the inserted _id
       user.activeStrategyId = user.careerStrategies[0]?._id?.toString() || '';
       await user.save();
     }
@@ -179,13 +182,15 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
                         || user.careerStrategies?.[0];
 
     // Compute or use cached readiness (cache for 1 hour)
+    step = 'compute_intelligence';
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const shouldRecompute = !user.readinessLastComputed || user.readinessLastComputed < oneHourAgo;
 
     let intelligence;
+    intelligence = await computeCareerIntelligence(userId);
+
     if (shouldRecompute) {
-      intelligence = await computeCareerIntelligence(userId);
-      // Cache to DB
+      step = 'cache_to_db';
       const updatePayload: any = {
         interviewReadinessScore: intelligence.readiness.overall,
         careerState: intelligence.careerState,
@@ -201,7 +206,7 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
 
       await User.findByIdAndUpdate(userId, updatePayload);
       
-      if (intelligence.newTrophies.length > 0) {
+      if (intelligence.newTrophies && intelligence.newTrophies.length > 0) {
         for (const trophy of intelligence.newTrophies) {
            await IntelligenceEvent.create({
              user: userId,
@@ -213,16 +218,17 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
            });
         }
       }
-    } else {
-      intelligence = await computeCareerIntelligence(userId);
     }
 
     // Trigger passive narration in background (No empty states policy)
+    step = 'passive_narration';
     triggerPassiveNarration(userId).catch(e => logger.warn('Failed to trigger passive narration', e));
 
     // Get existing roadmap
+    step = 'fetch_roadmap';
     const roadmap = await Roadmap.findOne({ user: userId }).sort({ createdAt: -1 });
 
+    step = 'send_response';
     res.json({
       intelligence,
       careerProfile: user.careerProfile, // legacy
@@ -243,8 +249,8 @@ export const getCareerIntelligence = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
-    logger.error(`[CareerController] getCareerIntelligence error: ${error.message}`);
-    res.status(500).json({ message: 'Failed to compute career intelligence', error: error.message });
+    logger.error(`[CareerController] CRASH at step="${step}" => ${error.message}\n${error.stack}`);
+    res.status(500).json({ message: `Failed at step: ${step}`, error: error.message });
   }
 };
 
