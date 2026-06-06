@@ -2,8 +2,13 @@ const axios = require('axios');
 
 async function check() {
   try {
-    const email = 'test@test.com';
+    const email = `test_${Date.now()}@test.com`;
     let token = '';
+    
+    console.log('Registering...');
+    await axios.post('https://ai-powered-mock-interview-platform-ha0o.onrender.com/api/auth/register', {
+      name: 'Test', email, password: 'password123'
+    });
     
     console.log('Logging in...');
     const loginRes = await axios.post('https://ai-powered-mock-interview-platform-ha0o.onrender.com/api/auth/login', {

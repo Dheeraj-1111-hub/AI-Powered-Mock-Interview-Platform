@@ -17,12 +17,19 @@ const setRefreshCookie = (res: Response, token: string) => {
   });
 };
 
-export const dropClerkIndex = async (req: Request, res: Response) => {
+import mongoose from 'mongoose';
+import CodingProblem from '../models/CodingProblem';
+
+export const dbInfo = async (req: Request, res: Response) => {
   try {
-    await User.collection.dropIndex('clerkId_1');
-    res.json({ message: 'clerkId_1 index dropped successfully!' });
+    const dbName = mongoose.connection.db.databaseName;
+    const uri = process.env.MONGODB_URI?.replace(/:([^:@]{3,})@/, ':***@'); // hide password
+    const count = await CodingProblem.countDocuments();
+    const rawCount = await mongoose.connection.db.collection('codingproblems').countDocuments();
+    
+    res.json({ dbName, uri, mongooseCount: count, nativeCount: rawCount });
   } catch (error: any) {
-    res.status(500).json({ message: 'Failed to drop index', error: error.message });
+    res.status(500).json({ message: 'Failed to get info', error: error.message });
   }
 };
 
