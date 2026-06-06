@@ -25,16 +25,19 @@ export const backfillCode = async (req: Request, res: Response) => {
     let count = 0;
     
     for (const p of problems) {
-      if (p.starterCode && p.starterCode.get('javascript')) {
-        const js = p.starterCode.get('javascript');
+      const js = p.starterCode?.get ? p.starterCode.get('javascript') : p.starterCode?.javascript;
+      
+      if (js) {
         const fnMatch = js.match(/function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
         
         if (fnMatch) {
           const fnName = fnMatch[1];
           const params = fnMatch[2];
           
-          if (!p.starterCode.get('cpp') || p.starterCode.get('cpp').includes('Implement functionName')) {
-            p.starterCode.set('cpp', `#include <iostream>
+          const currentCpp = p.starterCode?.get ? p.starterCode.get('cpp') : p.starterCode?.cpp;
+          const currentJava = p.starterCode?.get ? p.starterCode.get('java') : p.starterCode?.java;
+          
+          const cppCode = `#include <iostream>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -44,16 +47,30 @@ using namespace std;
 
 // Implement function: ${fnName}
 // Parameters: ${params}
-`);
-          }
-          if (!p.starterCode.get('java') || p.starterCode.get('java').includes('Implement functionName')) {
-            p.starterCode.set('java', `import java.util.*;
+`;
+
+          const javaCode = `import java.util.*;
 
 class Solution {
     // Implement function: ${fnName}
     // Parameters: ${params}
 }
-`);
+`;
+
+          if (!currentCpp || currentCpp.includes('Implement functionName')) {
+            if (p.starterCode?.set) {
+                p.starterCode.set('cpp', cppCode);
+            } else if (p.starterCode) {
+                p.starterCode.cpp = cppCode;
+            }
+          }
+          
+          if (!currentJava || currentJava.includes('Implement functionName')) {
+            if (p.starterCode?.set) {
+                p.starterCode.set('java', javaCode);
+            } else if (p.starterCode) {
+                p.starterCode.java = javaCode;
+            }
           }
           
           p.markModified('starterCode');
