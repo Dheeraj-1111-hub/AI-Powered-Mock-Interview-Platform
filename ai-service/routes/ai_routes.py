@@ -238,6 +238,11 @@ async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optiona
     if not text.strip():
         return {"error": "Could not extract text from the file."}
 
+    # Truncate text to avoid Groq Free Tier TPM limit (30,000 TPM -> max ~6000 words per minute)
+    if len(text) > 12000:
+        print(f"Truncating resume text from {len(text)} to 12000 chars.")
+        text = text[:12000] + "\n...[TRUNCATED FOR LENGTH]"
+
     prompt = RESUME_ANALYSIS_PROMPT.format(
         text=text, 
         jobDescription=jobDescription or "General Career Analysis",

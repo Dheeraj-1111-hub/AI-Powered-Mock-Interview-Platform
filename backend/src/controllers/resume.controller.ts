@@ -118,8 +118,11 @@ export const analyzeResume = async (req: Request, res: Response) => {
     console.error('[RESUME CONTROLLER ERROR]:', error.message);
     if (error.response) {
         console.error('[RESUME CONTROLLER ERROR DATA]:', error.response.data);
+        if (error.response.status === 429) {
+           return res.status(429).json({ message: 'AI Intelligence engine is currently experiencing high demand (Rate Limited). Please wait 30 seconds and try again.' });
+        }
     }
-    res.status(500).json({ message: 'Failed to analyze resume', error: error.message });
+    res.status(500).json({ message: 'Failed to analyze resume. The AI engine might be temporarily overloaded or the file could not be parsed.', error: error.message });
   }
 };
 
