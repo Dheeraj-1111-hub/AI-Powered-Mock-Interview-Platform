@@ -14,8 +14,9 @@ import {
 import { 
   BarChart3, TrendingUp, Target, Brain, ArrowLeft, 
   Sparkles, Zap, Flame, Clock, Calendar, ChevronRight,
-  Layout, ShieldCheck, Microscope, Award, Loader2
+  Layout, ShieldCheck, Microscope, Award
 } from 'lucide-react';
+import { PageLoader } from '../components/shared/PageLoader';
 import { Navbar } from '../components/shared/Navbar';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { cn } from '../utils/cn';
@@ -44,11 +45,7 @@ export default function AnalyticsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#030303] flex items-center justify-center">
-         <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Loading Forensic Intelligence" />;
   }
 
   const ii = data?.intelligenceIndex || { score: 0, breakdown: {} };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+ï»¿import { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Rocket, Map, Brain, Microscope, ChevronDown,
@@ -7,6 +7,7 @@ import {
 import { AuthContext } from '../services/auth.service';
 import { getCareerIntelligence, resetCareerOS } from '../services/api.service';
 import { Navbar } from '../components/shared/Navbar';
+import { PageLoader } from '../components/shared/PageLoader';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
 import { cn } from '../utils/cn';
 import CareerOnboarding from '../components/career/CareerOnboarding';
@@ -131,6 +132,8 @@ export default function CareerPage() {
   const projectedReadyDate = new Date();
   projectedReadyDate.setDate(projectedReadyDate.getDate() + (intel?.weeksToReadiness || 0) * 7);
   const readyMonthYear = projectedReadyDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  if (loading) return <PageLoader message="Calibrating Intelligence Engine" />;
 
   return (
     <div className="min-h-screen bg-[#030303] text-slate-100 font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
@@ -374,7 +377,7 @@ export default function CareerPage() {
                         </span>
                         {(intel?.readiness?.evidenceCount?.codingSessions || 0) < 5 && (
                           <div className="mt-1 text-amber-500/60">
-                            Score penalized {Math.round((1 - (intel?.readiness?.multiplier ?? 0.35)) * 100)}% for low evidence — grows as you practice in Coding Lab.
+                            Score penalized {Math.round((1 - (intel?.readiness?.multiplier ?? 0.35)) * 100)}% for low evidence ï¿½ grows as you practice in Coding Lab.
                           </div>
                         )}
                       </div>

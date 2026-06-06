@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navbar } from '../components/shared/Navbar';
+import { PageLoader } from '../components/shared/PageLoader';
 import { getEngineeringDNA } from '../services/api.service';
 import { 
   Dna, Brain, Activity, Target, ShieldAlert, CheckCircle2, AlertTriangle, 
@@ -45,15 +46,7 @@ export default function ProfilePage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#030303] flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        <div className="text-slate-500 text-xs font-mono uppercase tracking-widest animate-pulse relative z-10 flex items-center gap-3">
-          <Dna className="w-4 h-4 animate-spin" />
-          Synchronizing Behavioral Memory...
-        </div>
-      </div>
-    );
+    return <PageLoader message="Synchronizing Engineering DNA" />;
   }
 
   if (!data) return null;

@@ -4,8 +4,9 @@ import { motion } from 'framer-motion';
 import { 
   Trophy, Sparkles, Brain, ShieldAlert, CheckCircle, 
   AlertCircle, ChevronRight, Activity, Download, ArrowLeft,
-  Loader2, Zap, Target, Star
+  Zap, Target, Star
 } from 'lucide-react';
+import { PageLoader } from '../components/shared/PageLoader';
 import { getInterviewDetails } from '../services/api.service';
 import { Navbar } from '../components/shared/Navbar';
 import { SpotlightCard } from '../components/ui/SpotlightCard';
@@ -33,11 +34,7 @@ export default function ResultsPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#030303] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Compiling Session Report" />;
   }
 
   const report = interview?.report || {

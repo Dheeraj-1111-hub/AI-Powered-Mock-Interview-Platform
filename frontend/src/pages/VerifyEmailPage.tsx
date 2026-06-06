@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../services/api.service';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { PageLoader } from '../components/shared/PageLoader';
 import { GlowingButton } from '../components/ui/GlowingButton';
 
 export default function VerifyEmailPage() {
@@ -33,17 +34,11 @@ export default function VerifyEmailPage() {
     verify();
   }, [token]);
 
+  if (status === 'loading') return <PageLoader message="Verifying Neural Link" />;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="max-w-md w-full glass-panel rounded-3xl p-10 text-center border border-white/10 shadow-2xl">
-        {status === 'loading' && (
-          <div className="flex flex-col items-center">
-            <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
-            <h2 className="text-2xl font-bold text-white mb-2">Verifying Email</h2>
-            <p className="text-slate-400">Please wait while we verify your account...</p>
-          </div>
-        )}
-
         {status === 'success' && (
           <div className="flex flex-col items-center">
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-6">
