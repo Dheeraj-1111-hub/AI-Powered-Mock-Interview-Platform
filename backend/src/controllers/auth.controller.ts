@@ -56,6 +56,7 @@ class Solution {
 `);
           }
           
+          p.markModified('starterCode');
           await p.save();
           count++;
         }
