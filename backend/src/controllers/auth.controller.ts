@@ -25,16 +25,16 @@ export const backfillCode = async (req: Request, res: Response) => {
     let count = 0;
     
     for (const p of problems) {
-      if (p.starterCode && p.starterCode.javascript) {
-        const js = p.starterCode.javascript;
+      if (p.starterCode && p.starterCode.get('javascript')) {
+        const js = p.starterCode.get('javascript');
         const fnMatch = js.match(/function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
         
         if (fnMatch) {
           const fnName = fnMatch[1];
           const params = fnMatch[2];
           
-          if (!p.starterCode.cpp || p.starterCode.cpp.includes('Implement functionName')) {
-            p.starterCode.cpp = `#include <iostream>
+          if (!p.starterCode.get('cpp') || p.starterCode.get('cpp').includes('Implement functionName')) {
+            p.starterCode.set('cpp', `#include <iostream>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -44,20 +44,18 @@ using namespace std;
 
 // Implement function: ${fnName}
 // Parameters: ${params}
-`;
+`);
           }
-          if (!p.starterCode.java || p.starterCode.java.includes('Implement functionName')) {
-            p.starterCode.java = `import java.util.*;
+          if (!p.starterCode.get('java') || p.starterCode.get('java').includes('Implement functionName')) {
+            p.starterCode.set('java', `import java.util.*;
 
 class Solution {
     // Implement function: ${fnName}
     // Parameters: ${params}
 }
-`;
+`);
           }
           
-          // Need to mark modified since it's a mixed type or nested object
-          p.markModified('starterCode');
           await p.save();
           count++;
         }
