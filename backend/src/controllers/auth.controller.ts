@@ -118,6 +118,21 @@ export const verifyEmail = async (req: Request, res: Response) => {
   res.json({ message: 'Email verified successfully' });
 };
 
+export const forceResetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, newPassword } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    
+    res.json({ message: 'Password forcefully reset' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;

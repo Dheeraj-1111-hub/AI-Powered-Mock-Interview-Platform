@@ -78,7 +78,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   logger.error(`[CRITICAL]: ${err.message}`, { stack: err.stack, path: req.path });
   res.status(err.status || 500).json({
     message: 'A secure intelligence error occurred.',
-    error: process.env.NODE_ENV === 'development' ? err.message : {}
+    error: err.message
   });
 });
 
