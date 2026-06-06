@@ -41,7 +41,8 @@ export const analyzeResume = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
     
     const formData = new FormData();
-    formData.append('resume', fs.createReadStream(file.path), {
+    const fileBuffer = fs.readFileSync(file.path);
+    formData.append('resume', fileBuffer, {
       filename: file.originalname,
       contentType: file.mimetype,
     });
