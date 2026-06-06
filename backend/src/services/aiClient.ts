@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import redis from './redis';
 import crypto from 'crypto';
 import logger from './logger';
@@ -8,6 +9,15 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000/api'
 const aiClient = axios.create({
   baseURL: AI_SERVICE_URL,
   timeout: 120000,
+});
+
+// Implement retry logic to handle Render free-tier cold starts returning 429 or 503
+axiosRetry(aiClient, { 
+  retries: 3, 
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return error.response?.status === 429 || error.response?.status === 503 || error.response?.status === 502;
+  }
 });
 
 // PHASE 8: COST OPTIMIZATION CACHE
