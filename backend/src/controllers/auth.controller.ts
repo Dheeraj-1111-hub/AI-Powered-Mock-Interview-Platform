@@ -28,9 +28,9 @@ export const backfillCode = async (req: Request, res: Response) => {
       // Deep copy existing or get from map
       const existing: any = {};
       if (p.starterCode) {
-         if (typeof p.starterCode.get === 'function') {
-            for (const key of p.starterCode.keys()) {
-               existing[key] = p.starterCode.get(key);
+         if (typeof (p.starterCode as any).get === 'function') {
+            for (const key of Array.from((p.starterCode as any).keys())) {
+               existing[key as string] = (p.starterCode as any).get(key);
             }
          } else {
             Object.assign(existing, p.starterCode);
