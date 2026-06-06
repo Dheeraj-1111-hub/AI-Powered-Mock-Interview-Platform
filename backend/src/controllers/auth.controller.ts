@@ -25,7 +25,19 @@ export const backfillCode = async (req: Request, res: Response) => {
     let count = 0;
     
     for (const p of problems) {
-      const js = p.starterCode?.get ? p.starterCode.get('javascript') : p.starterCode?.javascript;
+      // Deep copy existing or get from map
+      const existing: any = {};
+      if (p.starterCode) {
+         if (typeof p.starterCode.get === 'function') {
+            for (const key of p.starterCode.keys()) {
+               existing[key] = p.starterCode.get(key);
+            }
+         } else {
+            Object.assign(existing, p.starterCode);
+         }
+      }
+      
+      const js = existing.javascript;
       
       if (js) {
         const fnMatch = js.match(/function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
@@ -34,10 +46,8 @@ export const backfillCode = async (req: Request, res: Response) => {
           const fnName = fnMatch[1];
           const params = fnMatch[2];
           
-          const currentCpp = p.starterCode?.get ? p.starterCode.get('cpp') : p.starterCode?.cpp;
-          const currentJava = p.starterCode?.get ? p.starterCode.get('java') : p.starterCode?.java;
-          
-          const cppCode = `#include <iostream>
+          if (!existing.cpp || existing.cpp.includes('Implement functionName')) {
+              existing.cpp = `#include <iostream>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -48,33 +58,24 @@ using namespace std;
 // Implement function: ${fnName}
 // Parameters: ${params}
 `;
-
-          const javaCode = `import java.util.*;
+          }
+          
+          if (!existing.java || existing.java.includes('Implement functionName')) {
+              existing.java = `import java.util.*;
 
 class Solution {
     // Implement function: ${fnName}
     // Parameters: ${params}
 }
 `;
-
-          if (!currentCpp || currentCpp.includes('Implement functionName')) {
-            if (p.starterCode?.set) {
-                p.starterCode.set('cpp', cppCode);
-            } else if (p.starterCode) {
-                p.starterCode.cpp = cppCode;
-            }
           }
           
-          if (!currentJava || currentJava.includes('Implement functionName')) {
-            if (p.starterCode?.set) {
-                p.starterCode.set('java', javaCode);
-            } else if (p.starterCode) {
-                p.starterCode.java = javaCode;
-            }
-          }
-          
+          // Re-assign entirely to bypass Mongoose Map/Object weirdness
+          p.starterCode = existing;
           p.markModified('starterCode');
-          await p.save();
+          
+          // Use updateOne to bypass validation/schema issues just in case
+          await CodingProblem.updateOne({ _id: p._id }, { $set: { starterCode: existing } });
           count++;
         }
       }
