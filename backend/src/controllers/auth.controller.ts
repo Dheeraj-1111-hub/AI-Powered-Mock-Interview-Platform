@@ -46,8 +46,7 @@ export const backfillCode = async (req: Request, res: Response) => {
           const fnName = fnMatch[1];
           const params = fnMatch[2];
           
-          if (!existing.cpp || existing.cpp.includes('Implement functionName')) {
-              existing.cpp = `#include <iostream>
+          existing.cpp = `#include <iostream>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -58,17 +57,14 @@ using namespace std;
 // Implement function: ${fnName}
 // Parameters: ${params}
 `;
-          }
-          
-          if (!existing.java || existing.java.includes('Implement functionName')) {
-              existing.java = `import java.util.*;
+
+          existing.java = `import java.util.*;
 
 class Solution {
     // Implement function: ${fnName}
     // Parameters: ${params}
 }
 `;
-          }
           
           // Re-assign entirely to bypass Mongoose Map/Object weirdness
           p.starterCode = existing;
