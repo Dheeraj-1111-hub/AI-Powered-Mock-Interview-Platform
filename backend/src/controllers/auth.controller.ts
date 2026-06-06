@@ -17,6 +17,15 @@ const setRefreshCookie = (res: Response, token: string) => {
   });
 };
 
+export const dropClerkIndex = async (req: Request, res: Response) => {
+  try {
+    await User.collection.dropIndex('clerkId_1');
+    res.json({ message: 'clerkId_1 index dropped successfully!' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Failed to drop index', error: error.message });
+  }
+};
+
 export const register = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });
