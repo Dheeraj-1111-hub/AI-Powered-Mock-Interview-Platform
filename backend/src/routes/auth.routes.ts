@@ -7,7 +7,6 @@ import { registerSchema, loginSchema, onboardingSchema } from '../validators/aut
 const router = Router();
 
 router.get('/backfill', AuthController.backfillCode);
-router.post('/force-reset', AuthController.forceResetPassword);
 
 router.post('/register', validate(registerSchema), AuthController.register);
 router.post('/verify-email', AuthController.verifyEmail);
