@@ -6,8 +6,6 @@ import { registerSchema, loginSchema, onboardingSchema } from '../validators/aut
 
 const router = Router();
 
-router.get('/db-info', AuthController.dbInfo);
-
 router.post('/register', validate(registerSchema), AuthController.register);
 router.post('/verify-email', AuthController.verifyEmail);
 router.post('/login', validate(loginSchema), AuthController.login);
