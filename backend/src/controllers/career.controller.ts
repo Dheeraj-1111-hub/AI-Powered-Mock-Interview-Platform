@@ -128,21 +128,21 @@ const validateAndSortWeeklyPlan = async (
       validated = validated.slice(0, targetWeekCount);
     } 
     // Pad if AI generated too few
-    else if (validated.length < targetWeekCount && validated.length > 0) {
-      const lastWeek = validated[validated.length - 1];
+    else if (validated.length < targetWeekCount) {
       const diff = targetWeekCount - validated.length;
       for (let j = 0; j < diff; j++) {
         const weekIdx = validated.length;
+        const baseWeek = weekIdx > 0 ? validated[weekIdx - 1] : { difficulty: 'Medium', focus: 'Algorithm Foundations' };
         const paddedProblems = await resolveWeekProblems(
-          { ...lastWeek, difficulty: 'Hard' }, weekIdx, targetCompany, weakTopics
+          { ...baseWeek, difficulty: weekIdx < 4 ? 'Easy' : weekIdx < 8 ? 'Medium' : 'Hard' }, weekIdx, targetCompany, weakTopics
         );
         validated.push({
-          ...lastWeek,
+          ...baseWeek,
           week: weekIdx + 1,
-          focus: `${lastWeek.focus} (Advanced)`,
+          focus: weekIdx === 0 ? 'Algorithm Foundations' : `${baseWeek.focus} (Advanced)`,
           problems: paddedProblems.length,
-          mockInterviews: 2,
-          difficulty: 'Hard',
+          mockInterviews: weekIdx < 2 ? 0 : weekIdx < 5 ? 1 : 2,
+          difficulty: weekIdx < 4 ? 'Easy' : weekIdx < 8 ? 'Medium' : 'Hard',
           specificProblems: paddedProblems,
         });
       }
@@ -351,9 +351,14 @@ export const initializeCareerProfile = async (req: Request, res: Response) => {
       initData = typeof initResponse.data.result === 'string'
         ? JSON.parse(initResponse.data.result)
         : initResponse.data.result;
-    } catch (aiError) {
-      logger.warn(`AI Roadmap generation failed. ${aiError}`);
-      throw new Error('Failed to generate career roadmap');
+    } catch (aiError: any) {
+      logger.warn(`AI Roadmap generation failed (${aiError.message || aiError}). Falling back to static default roadmap.`);
+      initData = {
+        title: `${targetRole || 'Software Engineer'} Acceleration Plan`,
+        phases: [{ name: 'Foundation', duration: '4 weeks', tasks: ['Arrays', 'Strings'] }],
+        weeklyPlan: [],
+        skillGaps: []
+      };
     }
 
     const weeklyPlan = await validateAndSortWeeklyPlan(
@@ -417,7 +422,6 @@ export const initializeCareerProfile = async (req: Request, res: Response) => {
 
     // 6. Commit final user state (Transaction complete)
     const finalUser = await User.findByIdAndUpdate(userId, {
-      careerBrain,
       careerProfile: {
         targetRole: targetRole || 'Software Engineer',
         dreamCompany: dreamCompany || '',
@@ -1037,21 +1041,32 @@ export const shiftStrategy = async (req: Request, res: Response) => {
     const intelligence = await computeCareerIntelligence(userId);
     const profile = user.careerProfile;
 
-    const initResponse = await axios.post(`${AI_SERVICE_URL}/career/profile/init`, {
-      targetRole: profile?.targetRole || user.role,
-      targetCompany: profile?.targetCompany || '',
-      currentYear: profile?.currentYear || 'junior',
-      dsaComfort: (profile as any)?.dsaComfort || 5,
-      systemDesignComfort: (profile as any)?.systemDesignComfort || 3,
-      dailyHoursAvailable: (profile as any)?.dailyHoursAvailable || 2,
-      weakTopics: intelligence.strugglingTopics.slice(0, 5),
-      strongTopics: [],
-      persona: newMode || 'faang_engineer',
-    });
+    let initData: any = {};
+    try {
+      const initResponse = await axios.post(`${AI_SERVICE_URL}/career/profile/init`, {
+        targetRole: profile?.targetRole || user.role,
+        targetCompany: profile?.targetCompany || '',
+        currentYear: profile?.currentYear || 'junior',
+        dsaComfort: (profile as any)?.dsaComfort || 5,
+        systemDesignComfort: (profile as any)?.systemDesignComfort || 3,
+        dailyHoursAvailable: (profile as any)?.dailyHoursAvailable || 2,
+        weakTopics: intelligence.strugglingTopics.slice(0, 5),
+        strongTopics: [],
+        persona: newMode || 'faang_engineer',
+      }, { timeout: 45000 });
 
-    const initData = typeof initResponse.data.result === 'string'
-      ? JSON.parse(initResponse.data.result)
-      : initResponse.data.result;
+      initData = typeof initResponse.data.result === 'string'
+        ? JSON.parse(initResponse.data.result)
+        : initResponse.data.result;
+    } catch (aiError: any) {
+      logger.warn(`AI Roadmap generation failed (${aiError.message || aiError}). Falling back to static default roadmap.`);
+      initData = {
+        title: `${profile?.targetRole || user.role} Acceleration Plan`,
+        phases: [{ name: 'Foundation', duration: '4 weeks', tasks: ['Arrays', 'Strings'] }],
+        weeklyPlan: [],
+        skillGaps: []
+      };
+    }
 
     const weeklyPlan = await validateAndSortWeeklyPlan(
       initData.weeklyPlan || [],
