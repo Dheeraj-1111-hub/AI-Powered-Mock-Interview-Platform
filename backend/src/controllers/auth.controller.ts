@@ -17,6 +17,59 @@ const setRefreshCookie = (res: Response, token: string) => {
   });
 };
 
+import CodingProblem from '../models/CodingProblem';
+
+export const backfillCode = async (req: Request, res: Response) => {
+  try {
+    const problems = await CodingProblem.find({});
+    let count = 0;
+    
+    for (const p of problems) {
+      if (p.starterCode && p.starterCode.javascript) {
+        const js = p.starterCode.javascript;
+        const fnMatch = js.match(/function\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+        
+        if (fnMatch) {
+          const fnName = fnMatch[1];
+          const params = fnMatch[2];
+          
+          if (!p.starterCode.cpp || p.starterCode.cpp.includes('Implement functionName')) {
+            p.starterCode.cpp = `#include <iostream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <algorithm>
+
+using namespace std;
+
+// Implement function: ${fnName}
+// Parameters: ${params}
+`;
+          }
+          if (!p.starterCode.java || p.starterCode.java.includes('Implement functionName')) {
+            p.starterCode.java = `import java.util.*;
+
+class Solution {
+    // Implement function: ${fnName}
+    // Parameters: ${params}
+}
+`;
+          }
+          
+          // Need to mark modified since it's a mixed type or nested object
+          p.markModified('starterCode');
+          await p.save();
+          count++;
+        }
+      }
+    }
+    
+    res.json({ message: 'Backfill complete', count });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 export const register = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });

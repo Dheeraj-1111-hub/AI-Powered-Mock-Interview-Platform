@@ -21,7 +21,9 @@ The JSON output MUST strictly match the following schema:
     "description": "The exact problem description. Explain the input parameters, what the function should calculate/process, and the returned outputs. Use Markdown formatting. Be extremely clear and mathematically precise.",
     "starterCode": {{
         "javascript": "function functionName(param1, param2) {{\\n    // Implement\\n}}",
-        "python": "def functionName(param1, param2):\\n    # Implement\\n    pass"
+        "python": "def functionName(param1, param2):\\n    # Implement\\n    pass",
+        "cpp": "#include <bits/stdc++.h>\\nusing namespace std;\\n\\n// Implement functionName(param1, param2) below\\n",
+        "java": "import java.util.*;\\n\\nclass Solution {{\\n    // Implement functionName(param1, param2) below\\n}}"
     }},
     "testCases": [
         {{ "input": "input_as_string_of_arguments", "expectedOutput": "expected_output_as_string", "hidden": false, "caseType": "sample" }},
