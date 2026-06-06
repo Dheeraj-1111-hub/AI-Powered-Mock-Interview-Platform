@@ -28,9 +28,13 @@ export const register = async (req: Request, res: Response) => {
   const verificationToken = generateToken();
   const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  const user = await User.create({ name, email, password: hashed, isEmailVerified: true });
-  
-  res.json({ message: 'Registration successful. Please log in.' });
+  try {
+    const user = await User.create({ name, email, password: hashed, isEmailVerified: true });
+    res.json({ message: 'Registration successful. Please log in.' });
+  } catch (error: any) {
+    console.error('Registration failed:', error);
+    res.status(500).json({ message: 'Registration failed', error: error.message });
+  }
 };
 
 export const verifyEmail = async (req: Request, res: Response) => {
@@ -49,18 +53,23 @@ export const verifyEmail = async (req: Request, res: Response) => {
 };
 
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ message: 'Invalid credentials' });
 
-  const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'supersecretjwtkey', { expiresIn: '15m' });
-  const refreshToken = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET || 'superrefreshkey', { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'supersecretjwtkey', { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET || 'superrefreshkey', { expiresIn: '7d' });
 
-  setRefreshCookie(res, refreshToken);
-  res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, onboardingCompleted: user.onboardingCompleted } });
+    setRefreshCookie(res, refreshToken);
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, onboardingCompleted: user.onboardingCompleted } });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Login failed', error: error.message });
+  }
 };
 
 export const refresh = async (req: Request, res: Response) => {
