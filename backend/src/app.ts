@@ -60,6 +60,7 @@ const apiLimiter = rateLimit({
   message: 'Intelligence rate limit exceeded. Please try again in 15 minutes.',
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false }
 });
 
 app.use('/api', apiLimiter);
