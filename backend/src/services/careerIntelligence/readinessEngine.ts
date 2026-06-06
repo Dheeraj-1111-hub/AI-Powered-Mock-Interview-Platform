@@ -290,6 +290,29 @@ export const computeCareerIntelligence = async (
   // --- Topic-Level Scoring ---
   // Topic mastery is now sourced entirely from AI reviews and execution data
   const codingLabScores: Partial<Record<CanonicalTopic, number>> = {};
+  
+  // If the user has zero real coding evidence, we MUST inject their diagnostic baseline
+  // Otherwise the Skill Matrix will show an empty "Complete onboarding" screen.
+  if (!hasRealEvidence && user.careerProfile) {
+      const strong = user.careerProfile.strongTopics || [];
+      const weak = user.careerProfile.weakTopics || [];
+      
+      Object.keys(TOPIC_REGISTRY).forEach(k => {
+          const canonical = k as CanonicalTopic;
+          // Check if topic is marked strong (either exact match or readable match)
+          if (strong.includes(canonical) || strong.includes(TOPIC_REGISTRY[canonical].label)) {
+              codingLabScores[canonical] = 80; // Baseline for strong
+          } else if (weak.includes(canonical) || weak.includes(TOPIC_REGISTRY[canonical].label)) {
+              codingLabScores[canonical] = 15; // Baseline for weak
+          } else {
+              // Give core FAANG topics a middle baseline so the matrix is populated
+              if (TOPIC_REGISTRY[canonical].faangWeight > 0) {
+                  codingLabScores[canonical] = 40; 
+              }
+          }
+      });
+  }
+
   allSubmissions.forEach((s: any) => {
       const cat = Object.keys(TOPIC_REGISTRY).find(
         k => (TOPIC_REGISTRY as any)[k].label === s.problem?.category || k === s.problem?.category
