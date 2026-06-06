@@ -20,7 +20,7 @@ import logger from './services/logger';
 dotenv.config();
 
 const app = express();
-app.set('trust proxy', 1); // Trust the reverse proxy (e.g., Render)
+app.set('trust proxy', true); // Trust the reverse proxy (e.g., Render, Cloudflare)
 
 // PHASE 8: PRODUCTION HARDENING
 app.use(helmet({
@@ -56,7 +56,7 @@ app.use(cookieParser());
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: process.env.NODE_ENV === 'production' ? 100 : 1000,
+  max: process.env.NODE_ENV === 'production' ? 5000 : 10000,
   message: 'Intelligence rate limit exceeded. Please try again in 15 minutes.',
   standardHeaders: true,
   legacyHeaders: false,
