@@ -3,12 +3,18 @@ import * as ResumeController from '../controllers/resume.controller';
 import { authMiddleware } from '../middleware/auth';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
+const uploadDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
@@ -29,7 +35,20 @@ const upload = multer({
 
 router.use(authMiddleware);
 
-router.post('/analyze', upload.single('resume'), ResumeController.analyzeResume);
+// Wrapper to catch Multer errors gracefully
+const uploadMiddleware = (req: any, res: any, next: any) => {
+  const uploadSingle = upload.single('resume');
+  uploadSingle(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ message: `Upload error: ${err.message}` });
+    } else if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    next();
+  });
+};
+
+router.post('/analyze', uploadMiddleware, ResumeController.analyzeResume);
 router.get('/history', ResumeController.getHistory);
 router.get('/latest', ResumeController.getLatest);
 
