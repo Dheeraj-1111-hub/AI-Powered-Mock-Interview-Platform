@@ -323,9 +323,23 @@ async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optiona
         parsed_result['globalAts']['format'] = format_validity
         parsed_result['globalAts']['parsing'] = 90 if len(text) > 200 else 15
 
-        # We completely removed the hardcoded 'Project Quality Boost (88)' and 'Recruiter Impact Boost (80)'
-        # Let the LLM's actual parsed metrics dictate the score.
+        # 3. Project Quality & Recruiter Impact Math
+        if 'projectQuality' not in parsed_result or not isinstance(parsed_result.get('projectQuality'), dict):
+            parsed_result['projectQuality'] = {}
+        
+        # If the LLM didn't return a score, deterministically calculate it
+        if parsed_result['projectQuality'].get('score') is None or parsed_result['projectQuality'].get('score') == 0:
+            if "project" in text_lower or "github" in text_lower:
+                parsed_result['projectQuality']['score'] = 82 if has_metrics else 65
+            else:
+                parsed_result['projectQuality']['score'] = 45
 
+        if 'recruiterImpact' not in parsed_result or not isinstance(parsed_result.get('recruiterImpact'), dict):
+            parsed_result['recruiterImpact'] = {}
+            
+        # If the LLM didn't return a score, deterministically calculate it
+        if parsed_result['recruiterImpact'].get('score') is None or parsed_result['recruiterImpact'].get('score') == 0:
+            parsed_result['recruiterImpact']['score'] = 88 if has_metrics else 55
         # 5. Missing / Standout Section Enforcement
         if 'sixSecondScan' not in parsed_result: parsed_result['sixSecondScan'] = {}
         
