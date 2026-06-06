@@ -38,7 +38,7 @@ def call_groq(prompt, system_message=None, temperature=0.2, json_mode=True, max_
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.1-8b-instant",
                 messages=messages,
                 temperature=temperature,
                 max_tokens=2048,
