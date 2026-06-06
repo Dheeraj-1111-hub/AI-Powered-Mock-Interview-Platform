@@ -20,10 +20,10 @@ The JSON output MUST strictly match the following schema:
     "scenario": "A simple, production-realistic software engineering context (1-2 sentences).",
     "description": "The exact problem description. Explain the input parameters, what the function should calculate/process, and the returned outputs. Use Markdown formatting. Be extremely clear and mathematically precise.",
     "starterCode": {{
-        "javascript": "function functionName(param1, param2) {{\\n    // Implement\\n}}",
-        "python": "def functionName(param1, param2):\\n    # Implement\\n    pass",
-        "cpp": "#include <bits/stdc++.h>\\nusing namespace std;\\n\\n// Implement functionName(param1, param2) below\\n",
-        "java": "import java.util.*;\\n\\nclass Solution {{\\n    // Implement functionName(param1, param2) below\\n}}"
+        "javascript": "function functionName(param1, param2) {{\\n    // Your code here\\n    return null;\\n}}",
+        "python": "def functionName(param1, param2):\\n    # Your code here\\n    pass",
+        "cpp": "#include <iostream>\\n#include <vector>\\n#include <string>\\n#include <unordered_map>\\n#include <unordered_set>\\n#include <algorithm>\\n\\nusing namespace std;\\n\\nReturnType functionName(Type param1, Type param2) {{\\n    // Your code here\\n    return {{}};\\n}}\\n",
+        "java": "import java.util.*;\\n\\nclass Solution {{\\n    public ReturnType functionName(Type param1, Type param2) {{\\n        // Your code here\\n        return null;\\n    }}\\n}}"
     }},
     "testCases": [
         {{ "input": "input_as_string_of_arguments", "expectedOutput": "expected_output_as_string", "hidden": false, "caseType": "sample" }},
@@ -53,6 +53,7 @@ Make sure:
 4. Include exactly 5 test cases: 2 'sample' cases, 1 'edge' case (empty, single element, or null boundary), 1 'boundary' case (maximum or minimum constraints), and 1 'stress' case (larger datasets/extreme performance bounds).
 5. Generate exactly 3 short-form, realistic developer comments in the 'discussions' array. Keep them brief and developer-like (e.g. 'fails on duplicates', 'memory overflow at 10^7 records').
 6. Ensure the description matches the title and tags perfectly while placing it in the grounded scenario.
+7. CRITICAL: The `starterCode` MUST contain fully defined function signatures. You must infer the exact ReturnType and parameter Types (e.g., `vector<int>`, `string`, `int[]`) for C++ and Java based on the test case inputs. Do NOT literally write 'ReturnType' or 'Type'.
 """
 
 def enrich_problem(title: str, difficulty: str, tags: list) -> dict:
