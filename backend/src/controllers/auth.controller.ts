@@ -19,17 +19,29 @@ const setRefreshCookie = (res: Response, token: string) => {
 
 import mongoose from 'mongoose';
 import CodingProblem from '../models/CodingProblem';
+import { MongoClient } from 'mongodb';
 
 export const dbInfo = async (req: Request, res: Response) => {
   try {
-    const dbName = mongoose.connection.db.databaseName;
-    const uri = process.env.MONGODB_URI?.replace(/:([^:@]{3,})@/, ':***@'); // hide password
-    const count = await CodingProblem.countDocuments();
-    const rawCount = await mongoose.connection.db.collection('codingproblems').countDocuments();
+    const sourceUri = 'mongodb+srv://ysaidheeraj1111_db_user:REMOVED_PASSWORD@cluster0.qz2wbuy.mongodb.net/test';
+    const client = new MongoClient(sourceUri);
+    await client.connect();
     
-    res.json({ dbName, uri, mongooseCount: count, nativeCount: rawCount });
+    const db = client.db('test');
+    const problems = await db.collection('codingproblems').find({}).toArray();
+    
+    let inserted = 0;
+    if (problems.length > 0) {
+      await mongoose.connection.db.collection('codingproblems').deleteMany({});
+      await mongoose.connection.db.collection('codingproblems').insertMany(problems);
+      inserted = problems.length;
+    }
+    
+    await client.close();
+    
+    res.json({ message: 'Migration successful', inserted });
   } catch (error: any) {
-    res.status(500).json({ message: 'Failed to get info', error: error.message });
+    res.status(500).json({ message: 'Migration failed', error: error.message });
   }
 };
 
