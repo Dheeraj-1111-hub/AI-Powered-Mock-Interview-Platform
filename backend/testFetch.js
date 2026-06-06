@@ -19,12 +19,12 @@ async function check() {
     
     console.log('Got token:', token.substring(0, 10));
 
-    console.log('Fetching problems...');
-    const probsRes = await axios.get('https://ai-powered-mock-interview-platform-ha0o.onrender.com/api/codes/problems', {
+    console.log('Fetching submissions...');
+    const probsRes = await axios.get('https://ai-powered-mock-interview-platform-ha0o.onrender.com/api/codes/submissions', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    console.log('Production problems count:', probsRes.data.length);
+    console.log('Production submissions count:', probsRes.data.length);
   } catch(e) {
     console.log('ERROR:', e.message);
     if (e.response) console.log(e.response.status, e.response.data);
