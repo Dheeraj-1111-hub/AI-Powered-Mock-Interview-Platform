@@ -340,6 +340,17 @@ async def analyze_resume(resume: UploadFile = File(...), jobDescription: Optiona
         # If the LLM didn't return a score, deterministically calculate it
         if parsed_result['recruiterImpact'].get('score') is None or parsed_result['recruiterImpact'].get('score') == 0:
             parsed_result['recruiterImpact']['score'] = 88 if has_metrics else 55
+            
+        # 4. Skill DNA Matrix Fallback (Prevents empty frontend radar charts)
+        if 'skillDNA' not in parsed_result or not isinstance(parsed_result.get('skillDNA'), dict):
+            parsed_result['skillDNA'] = {}
+        dna = parsed_result['skillDNA']
+        dna["keywords"] = dna.get("keywords") or (85 if present > 3 else 40)
+        dna["impact"] = dna.get("impact") or (90 if has_metrics else 30)
+        dna["brevity"] = dna.get("brevity") or (80 if len(text) < 4000 else 50)
+        dna["actionVerbs"] = dna.get("actionVerbs") or (85 if "developed" in text_lower else 45)
+        dna["formatting"] = dna.get("formatting") or format_validity
+
         # 5. Missing / Standout Section Enforcement
         if 'sixSecondScan' not in parsed_result: parsed_result['sixSecondScan'] = {}
         
@@ -442,6 +453,26 @@ async def evaluate_answer(request: EvaluateRequest):
     except Exception as e:
         print(f"Eval Error: {e} | Raw: {result}")
         raise HTTPException(status_code=500, detail="Failed to evaluate answer")
+
+@router.post('/review')
+async def evaluate_code_submission(request: CodeReviewRequest):
+    prompt = CODE_INTELLIGENCE_PROMPT.format(
+        language=request.language,
+        problemDescription=request.problemDescription,
+        staticAnalysis=json.dumps(request.staticAnalysis) if request.staticAnalysis else "None provided.",
+        executionStatus=request.executionStatus or "Unknown",
+        executionResults=json.dumps(request.executionResults) if request.executionResults else "[]",
+        code=request.code
+    )
+    
+    result = call_groq(prompt, json_mode=True)
+    try:
+        start = result.find('{')
+        end = result.rfind('}') + 1
+        return {'review': json.loads(result[start:end])}
+    except Exception as e:
+        print(f"Review Error: {e} | Raw: {result}")
+        raise HTTPException(status_code=500, detail="Failed to review code submission")
 
 @router.post('/follow-up')
 async def follow_up_question(request: FollowUpRequest):

@@ -4,11 +4,14 @@ import redis from './redis';
 import crypto from 'crypto';
 import logger from './logger';
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000/api';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8081/api';
 
 const aiClient = axios.create({
   baseURL: AI_SERVICE_URL,
-  timeout: 120000,
+  timeout: 35000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 // Implement retry logic to handle Render free-tier cold starts returning 429 or 503

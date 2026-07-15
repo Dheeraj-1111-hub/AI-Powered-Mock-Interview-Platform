@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -17,8 +17,6 @@ import morgan from 'morgan';
 
 import logger from './services/logger';
 
-dotenv.config();
-
 const app = express();
 app.set('trust proxy', true); // Trust the reverse proxy (e.g., Render, Cloudflare)
 
@@ -30,7 +28,7 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "http://localhost:8000", "https://api.groq.com"]
+      connectSrc: ["'self'", "http://localhost:8081", "https://api.groq.com"]
     }
   }
 }));
@@ -42,7 +40,7 @@ app.use(morgan('combined', {
 app.use(cors({ 
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);
-    const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5174', 'http://localhost:3000'];
+    const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000'];
     if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {

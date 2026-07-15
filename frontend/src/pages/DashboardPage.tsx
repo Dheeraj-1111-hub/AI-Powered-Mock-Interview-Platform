@@ -157,7 +157,7 @@ export default function DashboardPage() {
              <MetricCard 
                 label="Mastery Level" 
                 value={data?.telemetry?.mastery?.score || 0} 
-                suffix="PT"
+                suffix="%"
                 trend={data?.telemetry?.mastery?.level || "Beginner"}
                 icon={TerminalWindow} 
                 color="fuchsia"
@@ -233,7 +233,7 @@ export default function DashboardPage() {
                             return (
                               <div className="bg-[#111] px-4 py-3 rounded-xl border border-white/10 shadow-2xl backdrop-blur-xl">
                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{payload[0].payload.day}</p>
-                                <p className="text-base font-black text-white">{payload[0].value} <span className="text-[10px] text-slate-500">PT</span></p>
+                                <p className="text-base font-black text-white">{payload[0].value} <span className="text-[10px] text-slate-500">XP</span></p>
                                 <p className="text-[10px] font-medium text-slate-400 mt-1">{payload[0].payload.reason}</p>
                               </div>
                             );
